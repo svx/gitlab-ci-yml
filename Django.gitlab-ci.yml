@@ -26,7 +26,7 @@ before_script:
   # - apt-get update -q && apt-get install nodejs -yqq
   - pip install -r requirements.txt
 
-django:
+test:
   variables:
     DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/$POSTGRES_DB"
   script:
