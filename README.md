@@ -1,4 +1,5 @@
 # A collection of `.gitlab-ci.yml` templates
+[![build status](https://gitlab.com/gitlab-org/gitlab-ci-yml/badges/master/build.svg)](https://gitlab.com/gitlab-org/gitlab-ci-yml/commits/master) [![coverage report](https://gitlab.com/gitlab-org/gitlab-ci-yml/badges/master/coverage.svg)](https://gitlab.com/gitlab-org/gitlab-ci-yml/commits/master)
 
 This is GitLabs collection of [`.gitlab-ci.yml`][ci-docs] file templates, to be used
 in conjunction with [GitLab CI][gl-ci].
