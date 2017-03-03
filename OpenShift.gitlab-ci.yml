@@ -5,6 +5,7 @@ stages:
   - review
   - staging
   - production
+  - cleanup
 
 variables:
   OPENSHIFT_SERVER: openshift.default.svc.cluster.local
@@ -50,7 +51,7 @@ review:
 
 stop-review:
   <<: *deploy
-  stage: review
+  stage: cleanup
   script:
     - oc delete all -l "app=$APP"
   when: manual
