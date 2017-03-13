@@ -1,20 +1,10 @@
 # Explanation on the scripts:
 # https://gitlab.com/gitlab-examples/kubernetes-deploy/blob/master/README.md
-image: registry.gitlab.com/gitlab-examples/kubernetes-deploy
 
-variables:
-  # Application deployment domain
-  KUBE_DOMAIN: domain.example.com
-
-stages:
-  - build
-  - test
-  - review
-  - staging
-  - production
-  - cleanup
-
+##############################
 # Define some helper functions
+##############################
+
 .common: &common
   |
     set -eo pipefail
@@ -76,6 +66,10 @@ stages:
         return 1
       fi
     }
+
+##############################
+# Define auto deploy functions
+##############################
 
 .auto_build: &auto_build
   |
@@ -169,17 +163,28 @@ stages:
     echo "Removing app..."
     helm delete $CI_PROJECT_NAME-$CI_PROJECT_ID-$CI_ENVIRONMENT_SLUG
 
-before_script:
-  - *common
+##############################
+# Define basic job definitions
+##############################
 
-build:
+.auto_deploy_kubernetes: &auto_deploy_kubernetes
+  image: registry.gitlab.com/gitlab-examples/kubernetes-deploy
+  stages:
+    - build
+    - test
+    - review
+    - staging
+    - production
+    - cleanup
+
+.build_branches: &build_branches
   stage: build
   script:
     - *auto_build
   only:
     - branches
 
-production:
+.manual_deploy_to_production: &manual_deploy_to_production
   stage: production
   variables:
     CI_ENVIRONMENT_URL: http://$CI_PROJECT_NAME.$KUBE_DOMAIN
@@ -192,7 +197,31 @@ production:
   only:
     - master
 
-staging:
+.auto_deploy_to_production: &manual_deploy_to_production
+  stage: production
+  variables:
+    CI_ENVIRONMENT_URL: http://$CI_PROJECT_NAME.$KUBE_DOMAIN
+  script:
+    - *auto_deploy
+  environment:
+    name: production
+    url: http://$CI_PROJECT_NAME.$KUBE_DOMAIN
+  only:
+    - master
+
+.auto_deploy_tags_to_production: &manual_deploy_to_production
+  stage: production
+  variables:
+    CI_ENVIRONMENT_URL: http://$CI_PROJECT_NAME.$KUBE_DOMAIN
+  script:
+    - *auto_deploy
+  environment:
+    name: production
+    url: http://$CI_PROJECT_NAME.$KUBE_DOMAIN
+  only:
+    - tags
+
+.auto_deploy_to_staging: &auto_deploy_to_staging
   stage: staging
   variables:
     CI_ENVIRONMENT_URL: http://$CI_PROJECT_NAME-staging.$KUBE_DOMAIN
@@ -204,7 +233,7 @@ staging:
   only:
     - master
 
-review:
+.start_review: &start_review
   stage: review
   variables:
     CI_ENVIRONMENT_URL: http://$CI_PROJECT_NAME-$CI_ENVIRONMENT_SLUG.$KUBE_DOMAIN
@@ -227,7 +256,7 @@ review:
   except:
     - master
 
-stop_review:
+.stop_review: &stop_review
   stage: cleanup
   variables:
     GIT_STRATEGY: none
@@ -248,3 +277,44 @@ stop_review:
     - branches
   except:
     - master
+
+##############################
+# Define overall pipeline
+##############################
+
+.auto_deploy_kubernetes: &auto_deploy_kubernetes
+  image: registry.gitlab.com/gitlab-examples/kubernetes-deploy
+
+  stages:
+    - build
+    - test
+    - review
+    - staging
+    - production
+    - cleanup
+
+  before_script:
+    - *common
+
+  build:
+    <<: *build_branches
+
+  production:
+    <<: *manual_deploy_to_production
+
+  staging:
+    <<: *auto_deploy_to_staging
+
+  review:
+    <<: *start_review
+
+  stop_review:
+    <<: *stop_review
+
+# -----------------------------------------
+
+<<: *auto_deploy_kubernetes
+
+variables:
+  # Application deployment domain
+  KUBE_DOMAIN: domain.example.com
