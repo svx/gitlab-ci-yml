@@ -1,0 +1,250 @@
+# Explanation on the scripts:
+# https://gitlab.com/gitlab-examples/kubernetes-deploy/blob/master/README.md
+image: registry.gitlab.com/gitlab-examples/kubernetes-deploy
+
+variables:
+  # Application deployment domain
+  KUBE_DOMAIN: domain.example.com
+
+stages:
+  - build
+  - test
+  - review
+  - staging
+  - production
+  - cleanup
+
+# Define some helper functions
+.common: &common
+  |
+    set -eo pipefail
+
+    [[ "$TRACE" ]] && set -x
+
+    export CI_CONTAINER_NAME="ci_job_build_$CI_BUILD_ID"
+    export CI_REGISTRY_TAG="$CI_BUILD_REF_NAME"
+
+    create_kubeconfig() {
+      echo "Generating kubeconfig..."
+      export KUBECONFIG="$(pwd)/kubeconfig"
+      export KUBE_CLUSTER_OPTIONS=
+      if [[ -n "$KUBE_CA_PEM" ]]; then
+        echo "Using KUBE_CA_PEM..."
+        echo "$KUBE_CA_PEM" > "$(pwd)/kube.ca.pem"
+        export KUBE_CLUSTER_OPTIONS=--certificate-authority="$(pwd)/kube.ca.pem"
+      fi
+      kubectl config set-cluster gitlab-deploy --server="$KUBE_URL" $KUBE_CLUSTER_OPTIONS
+      kubectl config set-credentials gitlab-deploy --token="$KUBE_TOKEN" $KUBE_CLUSTER_OPTIONS
+      kubectl config set-context gitlab-deploy --cluster=gitlab-deploy --user=gitlab-deploy --namespace="$KUBE_NAMESPACE"
+      kubectl config use-context gitlab-deploy
+      echo ""
+    }
+
+    ensure_deploy_variables() {
+      if [[ -z "$KUBE_URL" ]]; then
+        echo "Missing KUBE_URL."
+        exit 1
+      fi
+
+      if [[ -z "$KUBE_TOKEN" ]]; then
+        echo "Missing KUBE_TOKEN."
+        exit 1
+      fi
+
+      if [[ -z "$KUBE_NAMESPACE" ]]; then
+        echo "Missing KUBE_NAMESPACE."
+        exit 1
+      fi
+
+      if [[ -z "$CI_ENVIRONMENT_SLUG" ]]; then
+        echo "Missing CI_ENVIRONMENT_SLUG."
+        exit 1
+      fi
+
+      if [[ -z "$CI_ENVIRONMENT_URL" ]]; then
+        echo "Missing CI_ENVIRONMENT_URL."
+        exit 1
+      fi
+    }
+
+    ping_kube() {
+      if kubectl version > /dev/null; then
+        echo "Kubernetes is online!"
+        echo ""
+      else
+        echo "Cannot connect to Kubernetes."
+        return 1
+      fi
+    }
+
+.auto_build: &auto_build
+  |
+    echo "Checking docker engine..."
+    if ! docker info &>/dev/null; then echo "Missing docker engine to build images."; echo "Running docker:dind locally with graph driver pointing to '/cache/docker'"
+    	if ! grep -q overlay /proc/filesystems; then
+    		echo "Missing overlay filesystem. Are you running recent enough kernel?"
+    		exit 1
+    	fi
+      if [[ ! -d /cache ]]; then
+        mkdir -p /cache
+        mount -t tmpfs tmpfs /cache
+      fi
+    	dockerd --host=unix:///var/run/docker.sock --storage-driver=overlay --graph=/cache/docker & &>/docker.log
+      trap 'kill %%' EXIT
+
+      echo "Waiting for docker..."
+    	for i in $(seq 1 60); do
+    		if docker info &> /dev/null; then
+    			break
+    		fi
+    		sleep 1s
+    	done
+
+    	if [[ "$i" == 60 ]]; then
+    		echo "Failed to start docker:dind..."
+    		cat /docker.log
+    		exit 1
+    	fi
+    	echo ""
+    fi
+
+    docker rm -f "$CI_CONTAINER_NAME" &>/dev/null || true
+
+    echo "Building application..."
+
+    if [[ -f Dockerfile ]]; then
+    	echo "Building Dockerfile-based application..."
+    	# Build Dockerfile
+    	docker build -t "$CI_REGISTRY_IMAGE:$CI_REGISTRY_TAG" .
+    else
+    	# Build heroku-based application
+    	echo "Building Heroku-based application using gliderlabs/herokuish docker image..."
+    	docker run -i --name="$CI_CONTAINER_NAME" -v "$(pwd):/tmp/app:ro" -v "/cache/herokuish:/tmp/cache"	gliderlabs/herokuish /bin/herokuish buildpack build
+    	docker commit "$CI_CONTAINER_NAME" "$CI_REGISTRY_IMAGE:$CI_REGISTRY_TAG"
+    	docker rm "$CI_CONTAINER_NAME" >/dev/null
+    	echo ""
+
+    	# Create a start command, start `web`
+    	echo "Configuring $CI_REGISTRY_IMAGE:$CI_REGISTRY_TAG docker image..."
+    	docker create --expose 5000 --env PORT=5000 --name="$CI_CONTAINER_NAME" "$CI_REGISTRY_IMAGE:$CI_REGISTRY_TAG" /bin/herokuish procfile start web
+    	docker commit "$CI_CONTAINER_NAME" "$CI_REGISTRY_IMAGE:$CI_REGISTRY_TAG"
+    	docker rm "$CI_CONTAINER_NAME" >/dev/null
+    	echo ""
+    fi
+
+    if [[ -n "$CI_BUILD_TOKEN" ]]; then
+    	echo "Logging to GitLab Container Registry with CI credentials..."
+    	docker login -u gitlab-ci-token -p "$CI_BUILD_TOKEN" "$CI_REGISTRY"
+    	echo ""
+    fi
+
+    echo "Pushing to GitLab Container Registry..."
+    docker push "$CI_REGISTRY_IMAGE:$CI_REGISTRY_TAG"
+    echo ""
+
+.auto_deploy: &auto_deploy
+  |
+    CI_ENVIRONMENT_HOSTNAME="${CI_ENVIRONMENT_URL}"
+    CI_ENVIRONMENT_HOSTNAME="${CI_ENVIRONMENT_HOSTNAME/http:\/\//}"
+    CI_ENVIRONMENT_HOSTNAME="${CI_ENVIRONMENT_HOSTNAME/https:\/\//}"
+
+    echo ciEnvironmentSlug=$CI_ENVIRONMENT_SLUG,ciPipelineID=\\"$CI_PIPELINE_ID\\",ciBuildID=\\"$CI_BUILD_ID\\",ciEnvironmentHostname=$CI_ENVIRONMENT_HOSTNAME,ciRegistryImage=$CI_REGISTRY_IMAGE,ciRegistryTag=$CI_REGISTRY_TAG
+
+    helm status $CI_PROJECT_NAME-$CI_PROJECT_ID-$CI_ENVIRONMENT_SLUG
+    if [[ $? -ne 0 ]]; then
+      echo "Creating initial release"
+      helm install --wait --name $CI_PROJECT_NAME-$CI_PROJECT_ID-$CI_ENVIRONMENT_SLUG --namespace $KUBE_NAMESPACE --set ciEnvironmentSlug=$CI_ENVIRONMENT_SLUG,ciPipelineID=\\"$CI_PIPELINE_ID\\",ciBuildID=\\"$CI_BUILD_ID\\",ciEnvironmentHostname=$CI_ENVIRONMENT_HOSTNAME,ciRegistryImage=$CI_REGISTRY_IMAGE,ciRegistryTag=$CI_REGISTRY_TAG gitlab/auto-deploy-app
+    else
+      echo "Upgrading release"
+      helm upgrade --wait $CI_PROJECT_NAME-$CI_PROJECT_ID-$CI_ENVIRONMENT_SLUG --namespace $KUBE_NAMESPACE --set ciEnvironmentSlug=$CI_ENVIRONMENT_SLUG,ciPipelineID=\\"$CI_PIPELINE_ID\\",ciBuildID=\\"$CI_BUILD_ID\\",ciEnvironmentHostname=$CI_ENVIRONMENT_HOSTNAME,ciRegistryImage=$CI_REGISTRY_IMAGE,ciRegistryTag=$CI_REGISTRY_TAG gitlab/auto-deploy-app
+    fi
+
+    echo "Application is accessible at: ${CI_ENVIRONMENT_URL}"
+    echo ""
+
+.auto_destroy: &auto_destroy
+  |
+    create_kubeconfig
+
+    echo "Removing app..."
+    helm delete $CI_PROJECT_NAME-$CI_PROJECT_ID-$CI_ENVIRONMENT_SLUG
+
+before_script:
+  - *common
+
+build:
+  stage: build
+  script:
+    - *auto_build
+  only:
+    - branches
+
+production:
+  stage: production
+  variables:
+    CI_ENVIRONMENT_URL: http://$CI_PROJECT_NAME.$KUBE_DOMAIN
+  script:
+    - *auto_deploy
+  environment:
+    name: production
+    url: http://$CI_PROJECT_NAME.$KUBE_DOMAIN
+  when: manual
+  only:
+    - master
+
+staging:
+  stage: staging
+  variables:
+    CI_ENVIRONMENT_URL: http://$CI_PROJECT_NAME-staging.$KUBE_DOMAIN
+  script:
+    - *auto_deploy
+  environment:
+    name: staging
+    url: http://$CI_PROJECT_NAME-staging.$KUBE_DOMAIN
+  only:
+    - master
+
+review:
+  stage: review
+  variables:
+    CI_ENVIRONMENT_URL: http://$CI_PROJECT_NAME-$CI_ENVIRONMENT_SLUG.$KUBE_DOMAIN
+  before_script:
+    - *common
+    - apk update && apk add curl bash openssl sudo
+    - curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash
+    - ensure_deploy_variables
+    - create_kubeconfig
+    - helm init --upgrade
+    - helm repo add gitlab https://charts.gitlab.io
+  script:
+    - *auto_deploy
+  environment:
+    name: review/$CI_BUILD_REF_SLUG
+    url: http://$CI_PROJECT_NAME-$CI_ENVIRONMENT_SLUG.$KUBE_DOMAIN
+    on_stop: stop_review
+  only:
+    - branches
+  except:
+    - master
+
+stop_review:
+  stage: cleanup
+  variables:
+    GIT_STRATEGY: none
+  before_script:
+    - *common
+    - apk update && apk add curl bash openssl sudo
+    - curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash
+    - ensure_deploy_variables
+    - create_kubeconfig
+    - helm init --client-only
+  script:
+    - *auto_destroy
+  environment:
+    name: review/$CI_BUILD_REF_SLUG
+    action: stop
+  when: manual
+  only:
+    - branches
+  except:
+    - master
