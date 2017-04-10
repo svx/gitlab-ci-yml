@@ -11,6 +11,7 @@ stages:
   - test
   - review
   - staging
+  - canary
   - production
   - cleanup
 
@@ -21,23 +22,32 @@ build:
   only:
     - branches
 
+canary:
+  stage: canary
+  script:
+    - command canary
+  environment:
+    name: production
+    url: http://$CI_PROJECT_NAME.$KUBE_DOMAIN
+  when: manual
+  allow_failure: false
+  only:
+    - master
+
 production:
   stage: production
-  variables:
-    CI_ENVIRONMENT_URL: http://$CI_PROJECT_NAME.$KUBE_DOMAIN
   script:
     - command deploy
   environment:
     name: production
     url: http://$CI_PROJECT_NAME.$KUBE_DOMAIN
   when: manual
+  allow_failure: false
   only:
     - master
 
 staging:
   stage: staging
-  variables:
-    CI_ENVIRONMENT_URL: http://$CI_PROJECT_NAME-staging.$KUBE_DOMAIN
   script:
     - command deploy
   environment:
@@ -48,8 +58,6 @@ staging:
 
 review:
   stage: review
-  variables:
-    CI_ENVIRONMENT_URL: http://$CI_PROJECT_NAME-$CI_ENVIRONMENT_SLUG.$KUBE_DOMAIN
   script:
     - command deploy
   environment:
@@ -71,6 +79,7 @@ stop_review:
     name: review/$CI_COMMIT_REF_NAME
     action: stop
   when: manual
+  allow_failure: true
   only:
     - branches
   except:
