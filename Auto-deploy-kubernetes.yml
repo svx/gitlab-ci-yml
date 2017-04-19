@@ -150,14 +150,8 @@ stages:
 
     echo ciEnvironmentSlug=$CI_ENVIRONMENT_SLUG,ciPipelineID=\\"$CI_PIPELINE_ID\\",ciBuildID=\\"$CI_BUILD_ID\\",ciEnvironmentHostname=$CI_ENVIRONMENT_HOSTNAME,ciRegistryImage=$CI_REGISTRY_IMAGE,ciRegistryTag=$CI_REGISTRY_TAG
 
-    helm status $CI_PROJECT_NAME-$CI_PROJECT_ID-$CI_ENVIRONMENT_SLUG
-    if [[ $? -ne 0 ]]; then
-      echo "Creating initial release"
-      helm install --wait --name $CI_PROJECT_NAME-$CI_PROJECT_ID-$CI_ENVIRONMENT_SLUG --namespace $KUBE_NAMESPACE --set ciEnvironmentSlug=$CI_ENVIRONMENT_SLUG,ciPipelineID=\\"$CI_PIPELINE_ID\\",ciBuildID=\\"$CI_BUILD_ID\\",ciEnvironmentHostname=$CI_ENVIRONMENT_HOSTNAME,ciRegistryImage=$CI_REGISTRY_IMAGE,ciRegistryTag=$CI_REGISTRY_TAG gitlab/auto-deploy-app
-    else
-      echo "Upgrading release"
-      helm upgrade --wait $CI_PROJECT_NAME-$CI_PROJECT_ID-$CI_ENVIRONMENT_SLUG --namespace $KUBE_NAMESPACE --set ciEnvironmentSlug=$CI_ENVIRONMENT_SLUG,ciPipelineID=\\"$CI_PIPELINE_ID\\",ciBuildID=\\"$CI_BUILD_ID\\",ciEnvironmentHostname=$CI_ENVIRONMENT_HOSTNAME,ciRegistryImage=$CI_REGISTRY_IMAGE,ciRegistryTag=$CI_REGISTRY_TAG gitlab/auto-deploy-app
-    fi
+    echo "Creating/upgrading release"
+    helm upgrade --wait -i $CI_PROJECT_NAME-$CI_PROJECT_ID-$CI_ENVIRONMENT_SLUG --namespace $KUBE_NAMESPACE --set ciEnvironmentSlug=$CI_ENVIRONMENT_SLUG,ciPipelineID=\\"$CI_PIPELINE_ID\\",ciBuildID=\\"$CI_BUILD_ID\\",ciEnvironmentHostname=$CI_ENVIRONMENT_HOSTNAME,ciRegistryImage=$CI_REGISTRY_IMAGE,ciRegistryTag=$CI_REGISTRY_TAG gitlab/auto-deploy-app
 
     echo "Application is accessible at: ${CI_ENVIRONMENT_URL}"
     echo ""
@@ -167,7 +161,7 @@ stages:
     create_kubeconfig
 
     echo "Removing app..."
-    helm delete $CI_PROJECT_NAME-$CI_PROJECT_ID-$CI_ENVIRONMENT_SLUG
+    helm delete --purge $CI_PROJECT_NAME-$CI_PROJECT_ID-$CI_ENVIRONMENT_SLUG
 
 before_script:
   - *common
