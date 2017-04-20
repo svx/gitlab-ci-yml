@@ -53,7 +53,7 @@ review:
   script:
     - command deploy
   environment:
-    name: review/$CI_COMMIT_REF_SLUG
+    name: review/$CI_COMMIT_REF_NAME
     url: http://$CI_PROJECT_NAME-$CI_ENVIRONMENT_SLUG.$KUBE_DOMAIN
     on_stop: stop_review
   only:
@@ -68,7 +68,7 @@ stop_review:
   script:
     - command destroy
   environment:
-    name: review/$CI_COMMIT_REF_SLUG
+    name: review/$CI_COMMIT_REF_NAME
     action: stop
   when: manual
   only:
