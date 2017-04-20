@@ -30,7 +30,6 @@ canary:
     name: production
     url: http://$CI_PROJECT_NAME.$KUBE_DOMAIN
   when: manual
-  allow_failure: false
   only:
     - master
 
@@ -42,7 +41,6 @@ production:
     name: production
     url: http://$CI_PROJECT_NAME.$KUBE_DOMAIN
   when: manual
-  allow_failure: false
   only:
     - master
 
