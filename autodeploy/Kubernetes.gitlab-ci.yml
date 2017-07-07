@@ -2,7 +2,7 @@ image: alpine:latest
 
 .configuration_variables: &configuration_variables
   # Application deployment domain
-  KUBE_DOMAIN: do.ayucloud.ovh
+  KUBE_DOMAIN: domain.example.com
 
   POSTGRES_USER: user
   POSTGRES_PASSWORD: testing-password
