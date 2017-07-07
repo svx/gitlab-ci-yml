@@ -99,7 +99,7 @@ variables:
   # Auto-deploy scripts
   CI_APPLICATION_REPOSITORY: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG
   CI_APPLICATION_TAG: $CI_COMMIT_SHA
-  CI_CONTAINER_NAME: "ci_job_build_${CI_BUILD_ID}"
+  CI_CONTAINER_NAME: "ci_job_build_${CI_JOB_ID}"
   TILLER_NAMESPACE: $KUBE_NAMESPACE
   INSTALL_DEPENDENCIES: |
     apk add -U openssl curl tar gzip bash ca-certificates git
@@ -182,7 +182,7 @@ variables:
       --set postgresql.postgresPassword="${POSTGRES_PASSWORD}" \
       --set postgresql.postgresDatabase="${POSTGRES_DB}" \
       --namespace="${KUBE_NAMESPACE}" \
-      --version="${CI_PIPELINE_ID}-${CI_BUILD_ID}" \
+      --version="${CI_PIPELINE_ID}-${CI_JOB_ID}" \
       "${CI_ENVIRONMENT_SLUG}" chart/
   DEPLOY_CANARY: |
     helm upgrade --install --wait \
@@ -196,7 +196,7 @@ variables:
       --set service.url="${CI_ENVIRONMENT_URL}" \
       --set postgresql.enabled="false" \
       --namespace="${KUBE_NAMESPACE}" \
-      --version="${CI_PIPELINE_ID}-${CI_BUILD_ID}" \
+      --version="${CI_PIPELINE_ID}-${CI_JOB_ID}" \
       "${CI_ENVIRONMENT_SLUG}-canary" chart/
   DELETE_DEPLOY: |
     echo "Removing all pods..."
