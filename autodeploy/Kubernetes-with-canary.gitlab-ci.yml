@@ -2,12 +2,12 @@ image: alpine:latest
 
 .configuration_variables: &configuration_variables
   # Application deployment domain
-  KUBE_DOMAIN: do.ayucloud.ovh
+  KUBE_DOMAIN: domain.example.com
 
   POSTGRES_USER: user
   POSTGRES_PASSWORD: testing-password
   POSTGRES_ENABLED: "true"
-  DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${CI_ENVIRONMENT_SLUG}-postgres:5432/$CI_ENVIRONMENT_SLUG/"
+  DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${CI_ENVIRONMENT_SLUG}-postgres:5432/$CI_ENVIRONMENT_SLUG"
 
 before_script:
   - eval "$INSTALL_DEPENDENCIES"
@@ -114,11 +114,11 @@ variables:
   # Auto-deploy scripts
   CI_APPLICATION_REPOSITORY: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG
   CI_APPLICATION_TAG: $CI_COMMIT_SHA
-  CI_CONTAINER_NAME: "ci_job_build_${CI_BUILD_ID}"
+  CI_CONTAINER_NAME: "ci_job_build_${CI_JOB_ID}"
   TILLER_NAMESPACE: $KUBE_NAMESPACE
   INSTALL_DEPENDENCIES: |
     apk add -U openssl curl tar gzip bash ca-certificates git
-    wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://raw.githubusercontent.com/sgerrand/alpine-pkg-glibc/master/sgerrand.rsa.pub 
+    wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://raw.githubusercontent.com/sgerrand/alpine-pkg-glibc/master/sgerrand.rsa.pub
     wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.23-r3/glibc-2.23-r3.apk
     apk add glibc-2.23-r3.apk
     rm glibc-2.23-r3.apk
@@ -133,7 +133,7 @@ variables:
   DOWNLOAD_CHART: |
     if [[ ! -d chart ]]; then
       helm repo add gitlab https://charts.gitlab.io
-      helm fetch gitlab/auto-deploy-app --untar
+      helm fetch ${CHART_URL:-gitlab/auto-deploy-app} --untar
       mv auto-deploy-app chart
     fi
   ENSURE_NAMESPACE: |
@@ -197,7 +197,7 @@ variables:
       --set postgresql.postgresPassword="${POSTGRES_PASSWORD}" \
       --set postgresql.postgresDatabase="${POSTGRES_DB}" \
       --namespace="${KUBE_NAMESPACE}" \
-      --version="${CI_PIPELINE_ID}-${CI_BUILD_ID}" \
+      --version="${CI_PIPELINE_ID}-${CI_JOB_ID}" \
       "${CI_ENVIRONMENT_SLUG}" chart/
   DEPLOY_CANARY: |
     helm upgrade --install --wait \
@@ -211,7 +211,7 @@ variables:
       --set service.url="${CI_ENVIRONMENT_URL}" \
       --set postgresql.enabled="false" \
       --namespace="${KUBE_NAMESPACE}" \
-      --version="${CI_PIPELINE_ID}-${CI_BUILD_ID}" \
+      --version="${CI_PIPELINE_ID}-${CI_JOB_ID}" \
       "${CI_ENVIRONMENT_SLUG}-canary" chart/
   DELETE_DEPLOY: |
     echo "Removing all pods..."

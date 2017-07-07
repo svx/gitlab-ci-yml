@@ -118,7 +118,7 @@ variables:
   DOWNLOAD_CHART: |
     if [[ ! -d chart ]]; then
       helm repo add gitlab https://charts.gitlab.io
-      helm fetch gitlab/auto-deploy-app --untar
+      helm fetch ${CHART_URL:-gitlab/auto-deploy-app} --untar
       mv auto-deploy-app chart
     fi
   ENSURE_NAMESPACE: |
