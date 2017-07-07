@@ -1,10 +1,17 @@
-# Explanation on the scripts:
-# https://gitlab.com/gitlab-examples/kubernetes-deploy/blob/master/README.md
-image: registry.gitlab.com/gitlab-examples/kubernetes-deploy
+image: alpine:latest
 
-variables:
+.configuration_variables: &configuration_variables
   # Application deployment domain
-  KUBE_DOMAIN: domain.example.com
+  KUBE_DOMAIN: do.ayucloud.ovh
+
+  POSTGRES_USER: user
+  POSTGRES_PASSWORD: testing-password
+  POSTGRES_ENABLED: "true"
+  DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${CI_ENVIRONMENT_SLUG}-postgres:5432/$CI_ENVIRONMENT_SLUG/"
+
+before_script:
+  - eval "$INSTALL_DEPENDENCIES"
+  - eval "$DOWNLOAD_CHART"
 
 stages:
   - build
@@ -16,18 +23,25 @@ stages:
 
 build:
   stage: build
+  image: docker:dind
+  before_script: []
+  variables:
+    DOCKER_DIND: overlay
   script:
-    - command build
+    - eval "$BUILD_DOCKER"
   only:
     - branches
 
 production:
   stage: production
   script:
-    - command deploy
+    - eval "$ENSURE_NAMESPACE"
+    - eval "$INSTALL_TILLER"
+    - eval "$CREATE_SECRET"
+    - eval "$DEPLOY_FINAL"
   environment:
     name: production
-    url: http://$CI_PROJECT_NAME.$KUBE_DOMAIN
+    url: http://$CI_PROJECT_PATH_SLUG.$KUBE_DOMAIN
   when: manual
   only:
     - master
@@ -35,20 +49,26 @@ production:
 staging:
   stage: staging
   script:
-    - command deploy
+    - eval "$ENSURE_NAMESPACE"
+    - eval "$INSTALL_TILLER"
+    - eval "$CREATE_SECRET"
+    - eval "$DEPLOY_FINAL"
   environment:
     name: staging
-    url: http://$CI_PROJECT_NAME-staging.$KUBE_DOMAIN
+    url: http://$CI_PROJECT_PATH_SLUG-staging.$KUBE_DOMAIN
   only:
     - master
 
 review:
   stage: review
   script:
-    - command deploy
+    - eval "$ENSURE_NAMESPACE"
+    - eval "$INSTALL_TILLER"
+    - eval "$CREATE_SECRET"
+    - eval "$DEPLOY_FINAL"
   environment:
     name: review/$CI_COMMIT_REF_NAME
-    url: http://$CI_PROJECT_NAME-$CI_ENVIRONMENT_SLUG.$KUBE_DOMAIN
+    url: http://$CI_PROJECT_PATH_SLUG-$CI_ENVIRONMENT_SLUG.$KUBE_DOMAIN
     on_stop: stop_review
   only:
     - branches
@@ -60,12 +80,125 @@ stop_review:
   variables:
     GIT_STRATEGY: none
   script:
-    - command destroy
+    - eval "$DELETE_DEPLOY"
   environment:
     name: review/$CI_COMMIT_REF_NAME
     action: stop
   when: manual
+  allow_failure: true
   only:
     - branches
   except:
     - master
+
+# ---------------------------------------------------------------------------
+
+variables:
+  <<: *configuration_variables
+
+  # Auto-deploy scripts
+  CI_APPLICATION_REPOSITORY: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG
+  CI_APPLICATION_TAG: $CI_COMMIT_SHA
+  CI_CONTAINER_NAME: "ci_job_build_${CI_BUILD_ID}"
+  TILLER_NAMESPACE: $KUBE_NAMESPACE
+  INSTALL_DEPENDENCIES: |
+    apk add -U openssl curl tar gzip bash ca-certificates git
+    wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://raw.githubusercontent.com/sgerrand/alpine-pkg-glibc/master/sgerrand.rsa.pub 
+    wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.23-r3/glibc-2.23-r3.apk
+    apk add glibc-2.23-r3.apk
+    rm glibc-2.23-r3.apk
+
+    curl https://kubernetes-helm.storage.googleapis.com/helm-v2.5.0-linux-amd64.tar.gz | tar zx
+    mv linux-amd64/helm /usr/bin/
+    helm version --client
+
+    curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v1.8.0-alpha.1/bin/linux/amd64/kubectl
+    chmod +x /usr/bin/kubectl
+    kubectl version --client
+  DOWNLOAD_CHART: |
+    if [[ ! -d chart ]]; then
+      helm repo add gitlab https://charts.gitlab.io
+      helm fetch gitlab/auto-deploy-app --untar
+      mv auto-deploy-app chart
+    fi
+  ENSURE_NAMESPACE: |
+    kubectl describe namespace "$KUBE_NAMESPACE" || kubectl create namespace "$KUBE_NAMESPACE"
+  BUILD_DOCKER: |
+    if [[ -f Dockerfile ]]; then
+      echo "Building Dockerfile-based application..."
+      docker build -t "${CI_APPLICATION_REPOSITORY}:${CI_APPLICATION_TAG}" .
+    else
+      echo "Building Heroku-based application using gliderlabs/herokuish docker image..."
+      docker run -i --name="${CI_CONTAINER_NAME}" -v "$(pwd):/tmp/app:ro" gliderlabs/herokuish /bin/herokuish buildpack build
+      docker commit "${CI_CONTAINER_NAME}" "${CI_APPLICATION_REPOSITORY}:${CI_APPLICATION_TAG}"
+      docker rm "${CI_CONTAINER_NAME}" >/dev/null
+      echo ""
+
+      echo "Configuring ${CI_APPLICATION_REPOSITORY}:${CI_APPLICATION_TAG} docker image..."
+      docker create --expose 5000 --env PORT=5000 --name="${CI_CONTAINER_NAME}" "${CI_APPLICATION_REPOSITORY}:${CI_APPLICATION_TAG}" /bin/herokuish procfile start web
+      docker commit "${CI_CONTAINER_NAME}" "${CI_APPLICATION_REPOSITORY}:${CI_APPLICATION_TAG}"
+      docker rm "${CI_CONTAINER_NAME}" >/dev/null
+      echo ""
+    fi
+
+    echo "Logging to GitLab Container Registry with CI credentials..."
+    docker login -u "${CI_REGISTRY_USER}" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    echo ""
+
+    echo "Pushing to GitLab Container Registry..."
+    docker push "${CI_APPLICATION_REPOSITORY}:${CI_APPLICATION_TAG}"
+    echo ""
+  INSTALL_TILLER: |
+    echo "Checking Tiller..."
+    if ! helm version &>/dev/null; then
+      echo "Configuring Tiller..."
+      helm init
+      kubectl rollout status -n "${TILLER_NAMESPACE}" -w "deployment/tiller-deploy"
+      if ! helm version --debug; then
+        echo "Failed to init Tiller."
+        return 1
+      fi
+    fi
+    echo ""
+  CREATE_SECRET: |
+    kubectl create secret -n ${KUBE_NAMESPACE} \
+      docker-registry gitlab-registry \
+      --docker-server="${CI_REGISTRY}" \
+      --docker-username="${CI_REGISTRY_USER}" \
+      --docker-password="${CI_REGISTRY_PASSWORD}" \
+      --docker-email="${GITLAB_USER_EMAIL}" \
+      -o yaml --dry-run | kubectl replace -n ${KUBE_NAMESPACE} --force -f -
+  DEPLOY_FINAL: |
+    helm upgrade --install --wait \
+      --set image.repository="${CI_APPLICATION_REPOSITORY}" \
+      --set image.tag="${CI_APPLICATION_TAG}" \
+      --set application.track="stable" \
+      --set application.postgresDatabase="${DATABASE_URL}" \
+      --set service.url="${CI_ENVIRONMENT_URL}" \
+      --set replicaCount="1" \
+      --set postgresql.enabled="${POSTGRES_ENABLED}" \
+      --set postgresql.nameOverride="postgres" \
+      --set postgresql.postgresUser="${POSTGRES_USER}" \
+      --set postgresql.postgresPassword="${POSTGRES_PASSWORD}" \
+      --set postgresql.postgresDatabase="${POSTGRES_DB}" \
+      --namespace="${KUBE_NAMESPACE}" \
+      --version="${CI_PIPELINE_ID}-${CI_BUILD_ID}" \
+      "${CI_ENVIRONMENT_SLUG}" chart/
+  DEPLOY_CANARY: |
+    helm upgrade --install --wait \
+      --set releaseOverride="${CI_ENVIRONMENT_SLUG}" \
+      --set image.repository="${CI_APPLICATION_REPOSITORY}" \
+      --set image.tag="${CI_APPLICATION_TAG}" \
+      --set application.track="canary" \
+      --set application.postgresDatabase="${DATABASE_URL}" \
+      --set replicaCount="1" \
+      --set service.enabled="false" \
+      --set service.url="${CI_ENVIRONMENT_URL}" \
+      --set postgresql.enabled="false" \
+      --namespace="${KUBE_NAMESPACE}" \
+      --version="${CI_PIPELINE_ID}-${CI_BUILD_ID}" \
+      "${CI_ENVIRONMENT_SLUG}-canary" chart/
+  DELETE_DEPLOY: |
+    echo "Removing all pods..."
+    helm delete "$CI_ENVIRONMENT_SLUG" || true
+    helm delete "$CI_ENVIRONMENT_SLUG-canary" || true
