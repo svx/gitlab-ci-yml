@@ -24,10 +24,12 @@ stages:
 
 build:
   stage: build
-  image: docker:dind
-  before_script: []
+  image: docker:git
+  services:
+  - docker:dind
   variables:
     DOCKER_DIND: overlay
+  before_script: []
   script:
     - eval "$BUILD_DOCKER"
   only:
