@@ -134,6 +134,7 @@ variables:
     kubectl version --client
   DOWNLOAD_CHART: |
     if [[ ! -d chart ]]; then
+      helm init --client-only
       helm repo add gitlab https://charts.gitlab.io
       helm fetch ${CHART_URL:-gitlab/auto-deploy-app} --untar
       mv auto-deploy-app chart
