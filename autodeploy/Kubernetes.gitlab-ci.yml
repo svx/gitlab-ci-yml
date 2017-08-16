@@ -34,6 +34,19 @@ build:
   only:
     - branches
 
+test:
+  stage: test
+  image: docker:git
+  services:
+  - docker:dind
+  variables:
+    DOCKER_DIND: overlay
+  before_script: []
+  script:
+    - eval "$RUN_TEST"
+  only:
+    - branches
+
 production:
   stage: production
   script:
@@ -161,6 +174,16 @@ variables:
 
     echo "Pushing to GitLab Container Registry..."
     docker push "$$CI_APPLICATION_REPOSITORY:$$CI_APPLICATION_TAG"
+    echo ""
+  RUN_TEST: |
+    if ! docker info &>/dev/null; then
+      if [ -z "$$DOCKER_HOST" -a "$$KUBERNETES_PORT" ]; then
+        export DOCKER_HOST='tcp://localhost:2375'
+      fi
+    fi
+
+    echo "Running tests for application using gitlab-org/herokuish docker image..."
+    docker run --rm -v "$$(pwd):/tmp/app:ro" registry.gitlab.com/gitlab-org/herokuish /bin/herokuish buildpack test
     echo ""
   INSTALL_TILLER: |
     echo "Checking Tiller..."
