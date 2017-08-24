@@ -260,6 +260,12 @@ variables:
       --docker-email="$$GITLAB_USER_EMAIL" \
       -o yaml --dry-run | kubectl replace -n "$$KUBE_NAMESPACE" --force -f -
   DEPLOY_FINAL: |
+    env_slug="$${CI_ENVIRONMENT_SLUG//-/_}"
+    env_slug="$${env_slug^^}"
+    eval new_replicas=\$$$${env_slug}_REPLICAS
+    if [[ -n "$$new_replicas" ]]; then
+      replicas="$$new_replicas"
+    fi
     helm upgrade --install \
       --wait \
       --set image.repository="$$CI_APPLICATION_REPOSITORY" \
@@ -280,6 +286,13 @@ variables:
 
     kubectl rollout status -n "$$KUBE_NAMESPACE" -w "deployment/$${CI_ENVIRONMENT_SLUG}-auto-deploy"
   DEPLOY_CANARY: |
+    env_track="$${track^^}"
+    env_slug="$${CI_ENVIRONMENT_SLUG//-/_}"
+    env_slug="$${env_slug^^}"
+    eval new_replicas=\$$$${env_track}_$${env_slug}_REPLICAS
+    if [[ -n "$$new_replicas" ]]; then
+      replicas="$$new_replicas"
+    fi
     helm upgrade --install \
       --wait \
       --set releaseOverride="$$CI_ENVIRONMENT_SLUG" \
