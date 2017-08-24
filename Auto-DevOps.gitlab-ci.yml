@@ -34,10 +34,6 @@ image: alpine:latest
   POSTGRES_DB: $CI_ENVIRONMENT_SLUG
   DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${CI_ENVIRONMENT_SLUG}-postgres:5432/$POSTGRES_DB"
 
-before_script:
-  - eval "$INSTALL_DEPENDENCIES"
-  - eval "$DOWNLOAD_CHART"
-
 stages:
   - build
   - test
@@ -54,7 +50,6 @@ build:
   - docker:dind
   variables:
     DOCKER_DRIVER: overlay
-  before_script: []
   script:
     - eval "$BUILD_DOCKER"
   only:
@@ -76,7 +71,6 @@ codeclimate:
     DOCKER_DRIVER: overlay
   services:
     - docker:dind
-  before_script: []
   script:
     - docker pull codeclimate/codeclimate
     - docker run --env CODECLIMATE_CODE="$PWD" --volume "$PWD":/code --volume /var/run/docker.sock:/var/run/docker.sock --volume /tmp/cc:/tmp/cc codeclimate/codeclimate init
@@ -87,6 +81,8 @@ codeclimate:
 review:
   stage: review
   script:
+    - eval "$INSTALL_DEPENDENCIES"
+    - eval "$DOWNLOAD_CHART"
     - eval "$ENSURE_NAMESPACE"
     - eval "$INSTALL_TILLER"
     - eval "$CREATE_SECRET"
@@ -105,6 +101,7 @@ stop_review:
   variables:
     GIT_STRATEGY: none
   script:
+    - eval "$INSTALL_DEPENDENCIES"
     - eval "$DELETE_FINAL"
   environment:
     name: review/$CI_COMMIT_REF_NAME
@@ -125,6 +122,8 @@ stop_review:
 # staging:
 #  stage: staging
 #  script:
+#    - eval "$INSTALL_DEPENDENCIES"
+#    - eval "$DOWNLOAD_CHART"
 #    - eval "$ENSURE_NAMESPACE"
 #    - eval "$INSTALL_TILLER"
 #    - eval "$CREATE_SECRET"
@@ -142,6 +141,8 @@ stop_review:
 # canary:
 #  stage: canary
 #  script:
+#    - eval "$INSTALL_DEPENDENCIES"
+#    - eval "$DOWNLOAD_CHART"
 #    - eval "$ENSURE_NAMESPACE"
 #    - eval "$INSTALL_TILLER"
 #    - eval "$CREATE_SECRET"
@@ -161,6 +162,8 @@ stop_review:
 production:
   stage: production
   script:
+    - eval "$INSTALL_DEPENDENCIES"
+    - eval "$DOWNLOAD_CHART"
     - eval "$ENSURE_NAMESPACE"
     - eval "$INSTALL_TILLER"
     - eval "$CREATE_SECRET"
