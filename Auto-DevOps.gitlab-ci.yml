@@ -57,7 +57,7 @@ test:
   stage: test
   image: registry.gitlab.com/gitlab-org/herokuish:latest
   before_script:
-    - copy -R . /tmp/app
+    - cp -R . /tmp/app
   before_script: []
   script:
     - /bin/herokuish buildpack test
