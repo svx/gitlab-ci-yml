@@ -6,7 +6,7 @@
 # * running code quality analysis,
 # * creating a review app for each topic branch,
 # * and continuous deployment to production
-# 
+#
 # In order to deploy, you must have a Kubernetes cluster configured either
 # via a project integration, or via group/project variables.
 # KUBE_DOMAIN must also be set as a variable at the group or project level,
@@ -58,6 +58,7 @@ test:
   image: registry.gitlab.com/gitlab-org/herokuish:latest
   before_script:
     - copy -R . /tmp/app
+  before_script: []
   script:
     - /bin/herokuish buildpack test
   only:
@@ -69,6 +70,7 @@ codeclimate:
     DOCKER_DRIVER: overlay
   services:
     - docker:dind
+  before_script: []
   script:
     - docker pull codeclimate/codeclimate
     - docker run --env CODECLIMATE_CODE="$PWD" --volume "$PWD":/code --volume /var/run/docker.sock:/var/run/docker.sock --volume /tmp/cc:/tmp/cc codeclimate/codeclimate init
@@ -108,7 +110,7 @@ stop_review:
   except:
     - master
 
-# Staging deploys are disabled by default since 
+# Staging deploys are disabled by default since
 # continuous deployment to production is enabled by default
 # If you prefer to automatically deploy to staging and
 # only manually promote to production, uncomment this job,
@@ -146,8 +148,8 @@ stop_review:
 #    - master
 
 # This job continuously deploys to production on every push to `master`.
-# To make this a manual process, either because you're enabling `staging` 
-# or `canary` deploys, or you simply want more control over when you deploy 
+# To make this a manual process, either because you're enabling `staging`
+# or `canary` deploys, or you simply want more control over when you deploy
 # to production, uncomment the `when: manual` line in the `production` job.
 
 production:
@@ -178,7 +180,7 @@ variables:
 
   INSTALL_DEPENDENCIES: |
     apk add -U openssl curl tar gzip bash ca-certificates git
-    wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://raw.githubusercontent.com/sgerrand/alpine-pkg-glibc/master/sgerrand.rsa.pub 
+    wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://raw.githubusercontent.com/sgerrand/alpine-pkg-glibc/master/sgerrand.rsa.pub
     wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.23-r3/glibc-2.23-r3.apk
     apk add glibc-2.23-r3.apk
     rm glibc-2.23-r3.apk
