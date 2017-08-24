@@ -24,7 +24,8 @@ image: alpine:latest
   POSTGRES_USER: user
   POSTGRES_PASSWORD: testing-password
   POSTGRES_ENABLED: "true"
-  DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${CI_ENVIRONMENT_SLUG}-postgres:5432/$CI_ENVIRONMENT_SLUG"
+  POSTGRES_DB: $CI_ENVIRONMENT_SLUG
+  DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${CI_ENVIRONMENT_SLUG}-postgres:5432/$POSTGRES_DB"
 
 before_script:
   - eval "$INSTALL_DEPENDENCIES"
@@ -172,7 +173,7 @@ variables:
   # Auto-deploy scripts
   CI_APPLICATION_REPOSITORY: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG
   CI_APPLICATION_TAG: $CI_COMMIT_SHA
-  CI_CONTAINER_NAME: ci_job_build_$${CI_JOB_ID}
+  CI_CONTAINER_NAME: ci_job_build_${CI_JOB_ID}
   TILLER_NAMESPACE: $KUBE_NAMESPACE
 
   INSTALL_DEPENDENCIES: |
@@ -262,7 +263,7 @@ variables:
       --set postgresql.nameOverride="postgres" \
       --set postgresql.postgresUser="$$POSTGRES_USER" \
       --set postgresql.postgresPassword="$$POSTGRES_PASSWORD" \
-      --set postgresql.postgresDatabase="$$CI_ENVIRONMENT_SLUG" \
+      --set postgresql.postgresDatabase="$$POSTGRES_DB" \
       --namespace="$$KUBE_NAMESPACE" \
       --version="$$CI_PIPELINE_ID-$$CI_JOB_ID" \
       "$$CI_ENVIRONMENT_SLUG" \
