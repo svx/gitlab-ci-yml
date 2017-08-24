@@ -1,0 +1,291 @@
+# Auto DevOps
+# This CI/CD configuration provides a standard pipeline for
+# * building a Docker image (using a buildpack if necessary),
+# * storing the image in the container registry,
+# * running tests from a buildpack,
+# * running code quality analysis,
+# * creating a review app for each topic branch,
+# * and continuous deployment to production
+# 
+# In order to deploy, you must have a Kubernetes cluster configured either
+# via a project integration, or via group/project variables.
+# KUBE_DOMAIN must also be set as a variable at the group or project level,
+# or manually added below.
+#
+# If you want to deploy to staging first, or enable canary deploys,
+# uncomment the relevant jobs in the pipeline below.
+
+image: alpine:latest
+
+.configuration_variables: &configuration_variables
+  # KUBE_DOMAIN is the application deployment domain and should be set as a variable at the group or project level.
+  # KUBE_DOMAIN: domain.example.com
+
+  POSTGRES_USER: user
+  POSTGRES_PASSWORD: testing-password
+  POSTGRES_ENABLED: "true"
+  DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${CI_ENVIRONMENT_SLUG}-postgres:5432/$CI_ENVIRONMENT_SLUG"
+
+before_script:
+  - eval "$INSTALL_DEPENDENCIES"
+  - eval "$DOWNLOAD_CHART"
+
+stages:
+  - build
+  - test
+  - review
+  - staging
+  - canary
+  - production
+  - cleanup
+
+build:
+  stage: build
+  image: docker:git
+  services:
+  - docker:dind
+  variables:
+    DOCKER_DRIVER: overlay
+  before_script: []
+  script:
+    - eval "$BUILD_DOCKER"
+  only:
+    - branches
+
+test:
+  stage: test
+  image: registry.gitlab.com/gitlab-org/herokuish:latest
+  before_script:
+    - copy -R . /tmp/app
+  script:
+    - /bin/herokuish buildpack test
+  only:
+    - branches
+
+codeclimate:
+  image: docker:latest
+  variables:
+    DOCKER_DRIVER: overlay
+  services:
+    - docker:dind
+  script:
+    - docker pull codeclimate/codeclimate
+    - docker run --env CODECLIMATE_CODE="$PWD" --volume "$PWD":/code --volume /var/run/docker.sock:/var/run/docker.sock --volume /tmp/cc:/tmp/cc codeclimate/codeclimate init
+    - docker run --env CODECLIMATE_CODE="$PWD" --volume "$PWD":/code --volume /var/run/docker.sock:/var/run/docker.sock --volume /tmp/cc:/tmp/cc codeclimate/codeclimate analyze -f json > codeclimate.json
+  artifacts:
+    paths: [codeclimate.json]
+
+review:
+  stage: review
+  script:
+    - eval "$ENSURE_NAMESPACE"
+    - eval "$INSTALL_TILLER"
+    - eval "$CREATE_SECRET"
+    - eval "$DEPLOY_FINAL"
+  environment:
+    name: review/$CI_COMMIT_REF_NAME
+    url: http://$CI_PROJECT_PATH_SLUG-$CI_ENVIRONMENT_SLUG.$KUBE_DOMAIN
+    on_stop: stop_review
+  only:
+    - branches
+  except:
+    - master
+
+stop_review:
+  stage: cleanup
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - eval "$DELETE_FINAL"
+  environment:
+    name: review/$CI_COMMIT_REF_NAME
+    action: stop
+  when: manual
+  allow_failure: true
+  only:
+    - branches
+  except:
+    - master
+
+# Staging deploys are disabled by default since 
+# continuous deployment to production is enabled by default
+# If you prefer to automatically deploy to staging and
+# only manually promote to production, uncomment this job,
+# and uncomment the `when: manual` line in the `production` job.
+
+# staging:
+#  stage: staging
+#  script:
+#    - eval "$ENSURE_NAMESPACE"
+#    - eval "$INSTALL_TILLER"
+#    - eval "$CREATE_SECRET"
+#    - eval "$DEPLOY_FINAL"
+#  environment:
+#    name: staging
+#    url: http://$CI_PROJECT_PATH_SLUG-staging.$KUBE_DOMAIN
+#  only:
+#    - master
+
+# Canaries are disabled by default, but if you want them,
+# and know what the downsides are, uncomment the `canary` job,
+# and uncomment the `when: manual` line in the `production` job.
+
+# canary:
+#  stage: canary
+#  script:
+#    - eval "$ENSURE_NAMESPACE"
+#    - eval "$INSTALL_TILLER"
+#    - eval "$CREATE_SECRET"
+#    - eval "$DEPLOY_CANARY"
+#  environment:
+#    name: production
+#    url: http://$CI_PROJECT_PATH_SLUG.$KUBE_DOMAIN
+#  when: manual
+#  only:
+#    - master
+
+# This job continuously deploys to production on every push to `master`.
+# To make this a manual process, either because you're enabling `staging` 
+# or `canary` deploys, or you simply want more control over when you deploy 
+# to production, uncomment the `when: manual` line in the `production` job.
+
+production:
+  stage: production
+  script:
+    - eval "$ENSURE_NAMESPACE"
+    - eval "$INSTALL_TILLER"
+    - eval "$CREATE_SECRET"
+    - eval "$DEPLOY_FINAL"
+    - eval "$DELETE_CANARY"
+  environment:
+    name: production
+    url: http://$CI_PROJECT_PATH_SLUG.$KUBE_DOMAIN
+#  when: manual
+  only:
+    - master
+
+# ---------------------------------------------------------------------------
+
+variables:
+  <<: *configuration_variables
+
+  # Auto-deploy scripts
+  CI_APPLICATION_REPOSITORY: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG
+  CI_APPLICATION_TAG: $CI_COMMIT_SHA
+  CI_CONTAINER_NAME: ci_job_build_$${CI_JOB_ID}
+  TILLER_NAMESPACE: $KUBE_NAMESPACE
+
+  INSTALL_DEPENDENCIES: |
+    apk add -U openssl curl tar gzip bash ca-certificates git
+    wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://raw.githubusercontent.com/sgerrand/alpine-pkg-glibc/master/sgerrand.rsa.pub 
+    wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.23-r3/glibc-2.23-r3.apk
+    apk add glibc-2.23-r3.apk
+    rm glibc-2.23-r3.apk
+
+    curl https://kubernetes-helm.storage.googleapis.com/helm-v2.5.0-linux-amd64.tar.gz | tar zx
+    mv linux-amd64/helm /usr/bin/
+    helm version --client
+
+    curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$$(curl -s https://storage.googleapis.com/kubernetes-release/release/latest.txt)/bin/linux/amd64/kubectl
+    chmod +x /usr/bin/kubectl
+    kubectl version --client
+  DOWNLOAD_CHART: |
+    if [[ ! -d chart ]]; then
+      helm init --client-only
+      helm repo add gitlab https://charts.gitlab.io
+      helm fetch $${CHART_URL:-gitlab/auto-deploy-app} --untar
+      mv auto-deploy-app chart
+    fi
+    helm dependency update chart/
+    helm dependency build chart/
+  ENSURE_NAMESPACE: |
+    kubectl describe namespace "$$KUBE_NAMESPACE" || kubectl create namespace "$$KUBE_NAMESPACE"
+  BUILD_DOCKER: |
+    if ! docker info &>/dev/null; then
+      if [ -z "$$DOCKER_HOST" -a "$$KUBERNETES_PORT" ]; then
+        export DOCKER_HOST='tcp://localhost:2375'
+      fi
+    fi
+    if [[ -f Dockerfile ]]; then
+      echo "Building Dockerfile-based application..."
+      docker build -t "$$CI_APPLICATION_REPOSITORY:$$CI_APPLICATION_TAG" .
+    else
+      echo "Building Heroku-based application using gliderlabs/herokuish docker image..."
+      docker run -i --name="$$CI_CONTAINER_NAME" -v "$$(pwd):/tmp/app:ro" gliderlabs/herokuish /bin/herokuish buildpack build
+      docker commit "$$CI_CONTAINER_NAME" "$$CI_APPLICATION_REPOSITORY:$$CI_APPLICATION_TAG"
+      docker rm "$$CI_CONTAINER_NAME" >/dev/null
+      echo ""
+
+      echo "Configuring $$CI_REGISTRY_IMAGE:$$CI_REGISTRY_TAG docker image..."
+      docker create --expose 5000 --env PORT=5000 --name="$$CI_CONTAINER_NAME" "$$CI_REGISTRY_IMAGE:$$CI_REGISTRY_TAG" /bin/herokuish procfile start web
+      docker commit "$$CI_CONTAINER_NAME" "$$CI_APPLICATION_REPOSITORY:$$CI_APPLICATION_TAG"
+      docker rm "$$CI_CONTAINER_NAME" >/dev/null
+      echo ""
+    fi
+
+    if [[ -n "$$CI_REGISTRY_USER" ]]; then
+      echo "Logging to GitLab Container Registry with CI credentials..."
+      docker login -u "$$CI_REGISTRY_USER" -p "$$CI_REGISTRY_PASSWORD" "$$CI_REGISTRY"
+      echo ""
+    fi
+
+    echo "Pushing to GitLab Container Registry..."
+    docker push "$$CI_APPLICATION_REPOSITORY:$$CI_APPLICATION_TAG"
+    echo ""
+  INSTALL_TILLER: |
+    echo "Checking Tiller..."
+    helm init
+    kubectl rollout status -n "$$TILLER_NAMESPACE" -w "deployment/tiller-deploy"
+    if ! helm version --debug; then
+      echo "Failed to init Tiller."
+      return 1
+    fi
+    echo ""
+  CREATE_SECRET: |
+    kubectl create secret -n "$$KUBE_NAMESPACE" \
+      docker-registry gitlab-registry \
+      --docker-server="$$CI_REGISTRY" \
+      --docker-username="$$CI_REGISTRY_USER" \
+      --docker-password="$$CI_REGISTRY_PASSWORD" \
+      --docker-email="$$GITLAB_USER_EMAIL" \
+      -o yaml --dry-run | kubectl replace -n "$$KUBE_NAMESPACE" --force -f -
+  DEPLOY_FINAL: |
+    helm upgrade --install \
+      --wait \
+      --set image.repository="$$CI_APPLICATION_REPOSITORY" \
+      --set image.tag="$$CI_APPLICATION_TAG" \
+      --set application.track="stable" \
+      --set application.postgresDatabase="$$DATABASE_URL" \
+      --set service.url="$$CI_ENVIRONMENT_URL" \
+      --set replicaCount="$$replicas" \
+      --set postgresql.enabled="$$POSTGRES_ENABLED" \
+      --set postgresql.nameOverride="postgres" \
+      --set postgresql.postgresUser="$$POSTGRES_USER" \
+      --set postgresql.postgresPassword="$$POSTGRES_PASSWORD" \
+      --set postgresql.postgresDatabase="$$CI_ENVIRONMENT_SLUG" \
+      --namespace="$$KUBE_NAMESPACE" \
+      --version="$$CI_PIPELINE_ID-$$CI_JOB_ID" \
+      "$$CI_ENVIRONMENT_SLUG" \
+      chart/
+
+    kubectl rollout status -n "$$KUBE_NAMESPACE" -w "deployment/$${CI_ENVIRONMENT_SLUG}-auto-deploy"
+  DEPLOY_CANARY: |
+    helm upgrade --install \
+      --wait \
+      --set releaseOverride="$$CI_ENVIRONMENT_SLUG" \
+      --set image.repository="$$CI_APPLICATION_REPOSITORY" \
+      --set image.tag="$$CI_APPLICATION_TAG" \
+      --set application.track="canary" \
+      --set application.postgresDatabase="$$DATABASE_URL" \
+      --set replicaCount="$$replicas" \
+      --set service.enabled="false" \
+      --set service.url="$$CI_ENVIRONMENT_URL" \
+      --set postgresql.enabled="false" \
+      --namespace="$$KUBE_NAMESPACE" \
+      --version="$$CI_PIPELINE_ID-$$CI_JOB_ID" \
+      "$$CI_ENVIRONMENT_SLUG-canary" \
+      chart/
+  DELETE_CANARY: |
+    helm delete "$$CI_ENVIRONMENT_SLUG-canary" || true
+  DELETE_FINAL: |
+    helm delete "$$CI_ENVIRONMENT_SLUG" || true
