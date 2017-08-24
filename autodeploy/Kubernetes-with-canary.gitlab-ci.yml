@@ -138,7 +138,7 @@ variables:
     if [[ ! -d chart ]]; then
       helm init --client-only
       helm repo add gitlab https://charts.gitlab.io
-      helm fetch ${CHART_URL:-gitlab/auto-deploy-app} --untar
+      helm fetch $${CHART_URL:-gitlab/auto-deploy-app} --untar
       mv auto-deploy-app chart
     fi
     helm dependency update chart/
