@@ -21,6 +21,7 @@
 # e.g. BUILDPACK_URL=https://github.com/heroku/heroku-buildpack-ruby.git#v142
 # If you need multiple buildpacks, add a file to your project called
 # `.buildpacks` that contains the URLs, one on each line, in order.
+# Note: Auto CI does not work with multiple buildpacks yet
 
 image: alpine:latest
 
