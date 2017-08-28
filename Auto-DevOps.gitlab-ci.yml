@@ -49,7 +49,7 @@ build:
   services:
   - docker:dind
   variables:
-    DOCKER_DRIVER: overlay
+    DOCKER_DRIVER: overlay2
   script:
     - eval "$BUILD_DOCKER"
   only:
@@ -68,7 +68,7 @@ test:
 codeclimate:
   image: docker:latest
   variables:
-    DOCKER_DRIVER: overlay
+    DOCKER_DRIVER: overlay2
   services:
     - docker:dind
   script:
