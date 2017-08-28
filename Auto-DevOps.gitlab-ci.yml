@@ -201,6 +201,7 @@ variables:
     curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$$(curl -s https://storage.googleapis.com/kubernetes-release/release/latest.txt)/bin/linux/amd64/kubectl
     chmod +x /usr/bin/kubectl
     kubectl version --client
+
   DOWNLOAD_CHART: |
     if [[ ! -d chart ]]; then
       helm init --client-only
@@ -210,8 +211,10 @@ variables:
     fi
     helm dependency update chart/
     helm dependency build chart/
+
   ENSURE_NAMESPACE: |
     kubectl describe namespace "$$KUBE_NAMESPACE" || kubectl create namespace "$$KUBE_NAMESPACE"
+
   BUILD_DOCKER: |
     if ! docker info &>/dev/null; then
       if [ -z "$$DOCKER_HOST" -a "$$KUBERNETES_PORT" ]; then
@@ -244,6 +247,7 @@ variables:
     echo "Pushing to GitLab Container Registry..."
     docker push "$$CI_APPLICATION_REPOSITORY:$$CI_APPLICATION_TAG"
     echo ""
+
   INSTALL_TILLER: |
     echo "Checking Tiller..."
     helm init
@@ -253,6 +257,7 @@ variables:
       return 1
     fi
     echo ""
+
   CREATE_SECRET: |
     kubectl create secret -n "$$KUBE_NAMESPACE" \
       docker-registry gitlab-registry \
@@ -261,6 +266,7 @@ variables:
       --docker-password="$$CI_REGISTRY_PASSWORD" \
       --docker-email="$$GITLAB_USER_EMAIL" \
       -o yaml --dry-run | kubectl replace -n "$$KUBE_NAMESPACE" --force -f -
+
   DEPLOY_FINAL: |
     env_slug="$${CI_ENVIRONMENT_SLUG//-/_}"
     env_slug="$${env_slug^^}"
@@ -287,6 +293,7 @@ variables:
       chart/
 
     kubectl rollout status -n "$$KUBE_NAMESPACE" -w "deployment/$${CI_ENVIRONMENT_SLUG}-auto-deploy"
+
   DEPLOY_CANARY: |
     env_track="$${track^^}"
     env_slug="$${CI_ENVIRONMENT_SLUG//-/_}"
@@ -310,7 +317,9 @@ variables:
       --version="$$CI_PIPELINE_ID-$$CI_JOB_ID" \
       "$$CI_ENVIRONMENT_SLUG-canary" \
       chart/
+
   DELETE_CANARY: |
     helm delete "$$CI_ENVIRONMENT_SLUG-canary" || true
+
   DELETE_FINAL: |
     helm delete "$$CI_ENVIRONMENT_SLUG" || true
