@@ -269,12 +269,13 @@ variables:
       -o yaml --dry-run | kubectl replace -n "$$KUBE_NAMESPACE" --force -f -
 
   DEPLOY_FINAL: |
-    env_slug="$${CI_ENVIRONMENT_SLUG//-/_}"
-    env_slug="$${env_slug^^}"
-    eval new_replicas=\$$$${env_slug}_REPLICAS
-    if [[ -n "$$new_replicas" ]]; then
-      replicas="$$new_replicas"
-    fi
+    # TODO fix replicas
+    #env_slug="$${CI_ENVIRONMENT_SLUG//-/_}"
+    #env_slug="$${env_slug^^}"
+    #eval new_replicas=\$$$${env_slug}_REPLICAS
+    #if [[ -n "$$new_replicas" ]]; then
+    #  replicas="$$new_replicas"
+    #fi
     helm upgrade --install \
       --wait \
       --set image.repository="$$CI_APPLICATION_REPOSITORY" \
