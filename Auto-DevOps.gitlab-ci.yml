@@ -33,7 +33,7 @@ image: alpine:latest
   POSTGRES_PASSWORD: testing-password
   POSTGRES_ENABLED: "true"
   POSTGRES_DB: $CI_ENVIRONMENT_SLUG
-  DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${CI_ENVIRONMENT_SLUG}-postgres:5432/$POSTGRES_DB"
+  DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${CI_ENVIRONMENT_SLUG}-postgres:5432/${POSTGRES_DB}"
 
 stages:
   - build
@@ -58,11 +58,16 @@ build:
     - branches
 
 test:
+  services:
+    - postgres:latest
+  variables:
+    POSTGRES_DB: test
   stage: test
   image: registry.gitlab.com/gitlab-org/herokuish:latest
   before_script:
     - cp -R . /tmp/app
   script:
+    - eval "$SETUP_TEST_DB"
     - /bin/herokuish buildpack test
   only:
     - branches
@@ -215,6 +220,14 @@ variables:
         export DOCKER_HOST='tcp://localhost:2375'
       fi
     fi
+
+  SETUP_TEST_DB: |
+    if [ -z $${KUBERNETES_PORT+x} ]; then
+      DB_HOST=postgres
+    else
+      DB_HOST=localhost
+    fi
+    export DATABASE_URL="postgres://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@$${DB_HOST}:5432/$${POSTGRES_DB}"
 
   DOWNLOAD_CHART: |
     if [[ ! -d chart ]]; then
