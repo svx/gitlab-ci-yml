@@ -33,7 +33,7 @@ image: alpine:latest
   POSTGRES_PASSWORD: testing-password
   POSTGRES_ENABLED: "true"
   POSTGRES_DB: $CI_ENVIRONMENT_SLUG
-  DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${CI_ENVIRONMENT_SLUG}-postgres:5432/${POSTGRES_DB}"
+  DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${CI_ENVIRONMENT_SLUG}-postgres:5432/${CI_ENVIRONMENT_SLUG}"
 
 stages:
   - build
@@ -310,7 +310,7 @@ variables:
       --set image.repository="$$CI_APPLICATION_REPOSITORY" \
       --set image.tag="$$CI_APPLICATION_TAG" \
       --set application.track="stable" \
-      --set application.postgresDatabase="$$DATABASE_URL" \
+      --set application.database_url="$$DATABASE_URL" \
       --set service.url="$$CI_ENVIRONMENT_URL" \
       --set replicaCount="$$replicas" \
       --set postgresql.enabled="$$POSTGRES_ENABLED" \
@@ -339,7 +339,7 @@ variables:
       --set image.repository="$$CI_APPLICATION_REPOSITORY" \
       --set image.tag="$$CI_APPLICATION_TAG" \
       --set application.track="canary" \
-      --set application.postgresDatabase="$$DATABASE_URL" \
+      --set application.database_url="$$DATABASE_URL" \
       --set replicaCount="$$replicas" \
       --set service.enabled="false" \
       --set service.url="$$CI_ENVIRONMENT_URL" \
