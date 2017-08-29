@@ -52,6 +52,7 @@ build:
   variables:
     DOCKER_DRIVER: overlay2
   script:
+    - eval "$SETUP_DOCKER"
     - eval "$BUILD_DOCKER"
   only:
     - branches
@@ -73,6 +74,7 @@ codeclimate:
   services:
     - docker:dind
   script:
+    - eval "$SETUP_DOCKER"
     - docker pull codeclimate/codeclimate
     - docker run --env CODECLIMATE_CODE="$PWD" --volume "$PWD":/code --volume /var/run/docker.sock:/var/run/docker.sock --volume /tmp/cc:/tmp/cc codeclimate/codeclimate init
     - docker run --env CODECLIMATE_CODE="$PWD" --volume "$PWD":/code --volume /var/run/docker.sock:/var/run/docker.sock --volume /tmp/cc:/tmp/cc codeclimate/codeclimate analyze -f json > codeclimate.json
@@ -203,6 +205,13 @@ variables:
     chmod +x /usr/bin/kubectl
     kubectl version --client
 
+  SETUP_DOCKER: |
+    if ! docker info &>/dev/null; then
+      if [ -z "$$DOCKER_HOST" -a "$$KUBERNETES_PORT" ]; then
+        export DOCKER_HOST='tcp://localhost:2375'
+      fi
+    fi
+
   DOWNLOAD_CHART: |
     if [[ ! -d chart ]]; then
       helm init --client-only
@@ -217,11 +226,6 @@ variables:
     kubectl describe namespace "$$KUBE_NAMESPACE" || kubectl create namespace "$$KUBE_NAMESPACE"
 
   BUILD_DOCKER: |
-    if ! docker info &>/dev/null; then
-      if [ -z "$$DOCKER_HOST" -a "$$KUBERNETES_PORT" ]; then
-        export DOCKER_HOST='tcp://localhost:2375'
-      fi
-    fi
     if [[ -f Dockerfile ]]; then
       echo "Building Dockerfile-based application..."
       docker build -t "$$CI_APPLICATION_REPOSITORY:$$CI_APPLICATION_TAG" .
