@@ -84,6 +84,7 @@ codeclimate:
 review:
   stage: review
   script:
+    - eval "$CHECK_KUBE_DOMAIN"
     - eval "$INSTALL_DEPENDENCIES"
     - eval "$DOWNLOAD_CHART"
     - eval "$ENSURE_NAMESPACE"
@@ -125,6 +126,7 @@ stop_review:
 # staging:
 #  stage: staging
 #  script:
+#    - eval "$CHECK_KUBE_DOMAIN"
 #    - eval "$INSTALL_DEPENDENCIES"
 #    - eval "$DOWNLOAD_CHART"
 #    - eval "$ENSURE_NAMESPACE"
@@ -144,6 +146,7 @@ stop_review:
 # canary:
 #  stage: canary
 #  script:
+#    - eval "$CHECK_KUBE_DOMAIN"
 #    - eval "$INSTALL_DEPENDENCIES"
 #    - eval "$DOWNLOAD_CHART"
 #    - eval "$ENSURE_NAMESPACE"
@@ -165,6 +168,7 @@ stop_review:
 production:
   stage: production
   script:
+    - eval "$CHECK_KUBE_DOMAIN"
     - eval "$INSTALL_DEPENDENCIES"
     - eval "$DOWNLOAD_CHART"
     - eval "$ENSURE_NAMESPACE"
@@ -224,6 +228,14 @@ variables:
 
   ENSURE_NAMESPACE: |
     kubectl describe namespace "$$KUBE_NAMESPACE" || kubectl create namespace "$$KUBE_NAMESPACE"
+
+  CHECK_KUBE_DOMAIN: |
+    if [ -z $${KUBE_DOMAIN+x} ]; then
+      echo "In order to deploy, KUBE_DOMAIN must be set as a variable at the group or project level, or manually added in .gitlab-cy.yml"
+      false
+    else
+      true
+    fi
 
   BUILD_DOCKER: |
     if [[ -f Dockerfile ]]; then
