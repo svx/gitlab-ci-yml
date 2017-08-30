@@ -101,7 +101,9 @@ review:
     url: http://$CI_PROJECT_PATH_SLUG-$CI_ENVIRONMENT_SLUG.$KUBE_DOMAIN
     on_stop: stop_review
   only:
-    - branches
+    refs:
+      - branches
+    kubernetes: true
   except:
     - master
 
@@ -118,7 +120,9 @@ stop_review:
   when: manual
   allow_failure: true
   only:
-    - branches
+    refs:
+      - branches
+    kubernetes: true
   except:
     - master
 
@@ -142,7 +146,9 @@ stop_review:
 #    name: staging
 #    url: http://$CI_PROJECT_PATH_SLUG-staging.$KUBE_DOMAIN
 #  only:
-#    - master
+#    refs:
+#      - master
+#    kubernetes: true
 
 # Canaries are disabled by default, but if you want them,
 # and know what the downsides are, uncomment the `canary` job,
@@ -163,7 +169,9 @@ stop_review:
 #    url: http://$CI_PROJECT_PATH_SLUG.$KUBE_DOMAIN
 #  when: manual
 #  only:
-#    - master
+#    refs:
+#      - master
+#    kubernetes: true
 
 # This job continuously deploys to production on every push to `master`.
 # To make this a manual process, either because you're enabling `staging`
@@ -186,7 +194,9 @@ production:
     url: http://$CI_PROJECT_PATH_SLUG.$KUBE_DOMAIN
 #  when: manual
   only:
-    - master
+    refs:
+      - master
+    kubernetes: true
 
 # ---------------------------------------------------------------------------
 
