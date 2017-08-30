@@ -128,7 +128,7 @@ stop_review:
 # only manually promote to production, uncomment this job,
 # and uncomment the `when: manual` line in the `production` job.
 
-# staging:
+#staging:
 #  stage: staging
 #  script:
 #    - eval "$CHECK_KUBE_DOMAIN"
@@ -148,7 +148,7 @@ stop_review:
 # and know what the downsides are, uncomment the `canary` job,
 # and uncomment the `when: manual` line in the `production` job.
 
-# canary:
+#canary:
 #  stage: canary
 #  script:
 #    - eval "$CHECK_KUBE_DOMAIN"
@@ -326,13 +326,14 @@ variables:
     kubectl rollout status -n "$$KUBE_NAMESPACE" -w "deployment/$${CI_ENVIRONMENT_SLUG}-auto-deploy"
 
   DEPLOY_CANARY: |
-    env_track="$${track^^}"
-    env_slug="$${CI_ENVIRONMENT_SLUG//-/_}"
-    env_slug="$${env_slug^^}"
-    eval new_replicas=\$$$${env_track}_$${env_slug}_REPLICAS
-    if [[ -n "$$new_replicas" ]]; then
-      replicas="$$new_replicas"
-    fi
+    # TODO fix replicas
+    # env_track="$${track^^}"
+    # env_slug="$${CI_ENVIRONMENT_SLUG//-/_}"
+    # env_slug="$${env_slug^^}"
+    # eval new_replicas=\$$$${env_track}_$${env_slug}_REPLICAS
+    # if [[ -n "$$new_replicas" ]]; then
+    #   replicas="$$new_replicas"
+    # fi
     helm upgrade --install \
       --wait \
       --set releaseOverride="$$CI_ENVIRONMENT_SLUG" \
