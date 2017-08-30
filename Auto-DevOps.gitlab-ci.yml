@@ -280,7 +280,7 @@ variables:
 
   INSTALL_TILLER: |
     echo "Checking Tiller..."
-    helm init
+    helm init --upgrade
     kubectl rollout status -n "$$TILLER_NAMESPACE" -w "deployment/tiller-deploy"
     if ! helm version --debug; then
       echo "Failed to init Tiller."
