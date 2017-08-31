@@ -25,7 +25,7 @@
 
 image: alpine:latest
 
-.configuration_variables: &configuration_variables
+variables:
   # KUBE_DOMAIN is the application deployment domain and should be set as a variable at the group or project level.
   # KUBE_DOMAIN: domain.example.com
 
@@ -33,7 +33,6 @@ image: alpine:latest
   POSTGRES_PASSWORD: testing-password
   POSTGRES_ENABLED: "true"
   POSTGRES_DB: $CI_ENVIRONMENT_SLUG
-  DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${CI_ENVIRONMENT_SLUG}-postgres:5432/${CI_ENVIRONMENT_SLUG}"
 
 stages:
   - build
@@ -52,8 +51,8 @@ build:
   variables:
     DOCKER_DRIVER: overlay2
   script:
-    - eval "$SETUP_DOCKER"
-    - eval "$BUILD_DOCKER"
+    - setup_docker
+    - build
   only:
     - branches
 
@@ -64,10 +63,9 @@ test:
     POSTGRES_DB: test
   stage: test
   image: gliderlabs/herokuish:latest
-  before_script:
-    - cp -R . /tmp/app
   script:
-    - eval "$SETUP_TEST_DB"
+    - setup_test_db
+    - cp -R . /tmp/app
     - /bin/herokuish buildpack test
   only:
     - branches
@@ -80,28 +78,31 @@ codeclimate:
   services:
     - docker:dind
   script:
-    - eval "$SETUP_DOCKER"
+    - setup_docker
     - docker pull codeclimate/codeclimate
-    - docker run --env CODECLIMATE_CODE="$PWD" --volume "$PWD":/code --volume /var/run/docker.sock:/var/run/docker.sock --volume /tmp/cc:/tmp/cc codeclimate/codeclimate init
-    - docker run --env CODECLIMATE_CODE="$PWD" --volume "$PWD":/code --volume /var/run/docker.sock:/var/run/docker.sock --volume /tmp/cc:/tmp/cc codeclimate/codeclimate analyze -f json > codeclimate.json
+    - codequality init
+    - codequality analyze -f json > codeclimate.json
   artifacts:
     paths: [codeclimate.json]
 
 review:
   stage: review
   script:
-    - eval "$CHECK_KUBE_DOMAIN"
-    - eval "$INSTALL_DEPENDENCIES"
-    - eval "$DOWNLOAD_CHART"
-    - eval "$ENSURE_NAMESPACE"
-    - eval "$INSTALL_TILLER"
-    - eval "$CREATE_SECRET"
+    - check_kube_domain
+    - install_dependencies
+    - download_chart
+    - ensure_namespace
+    - install_tiller
+    - create_secret
     - deploy
   environment:
     name: review/$CI_COMMIT_REF_NAME
     url: http://$CI_PROJECT_PATH_SLUG-$CI_ENVIRONMENT_SLUG.$KUBE_DOMAIN
     on_stop: stop_review
   only:
+    # refs:
+    #   - branches
+    # kubernetes: true
     - branches
   except:
     - master
@@ -111,14 +112,17 @@ stop_review:
   variables:
     GIT_STRATEGY: none
   script:
-    - eval "$INSTALL_DEPENDENCIES"
-    - eval "$DELETE_FINAL"
+    - install_dependencies
+    - delete
   environment:
     name: review/$CI_COMMIT_REF_NAME
     action: stop
   when: manual
   allow_failure: true
   only:
+    # refs:
+    #   - branches
+    # kubernetes: true
     - branches
   except:
     - master
@@ -129,42 +133,48 @@ stop_review:
 # only manually promote to production, uncomment this job,
 # and uncomment the `when: manual` line in the `production` job.
 
-#staging:
-#  stage: staging
-#  script:
-#    - eval "$CHECK_KUBE_DOMAIN"
-#    - eval "$INSTALL_DEPENDENCIES"
-#    - eval "$DOWNLOAD_CHART"
-#    - eval "$ENSURE_NAMESPACE"
-#    - eval "$INSTALL_TILLER"
-#    - eval "$CREATE_SECRET"
-#    - deploy
-#  environment:
-#    name: staging
-#    url: http://$CI_PROJECT_PATH_SLUG-staging.$KUBE_DOMAIN
-#  only:
-#    - master
+.staging:
+  stage: staging
+  script:
+    - check_kube_domain
+    - install_dependencies
+    - download_chart
+    - ensure_namespace
+    - install_tiller
+    - create_secret
+    - deploy
+  environment:
+    name: staging
+    url: http://$CI_PROJECT_PATH_SLUG-staging.$KUBE_DOMAIN
+  only:
+    # refs:
+    #   - master
+    # kubernetes: true
+    - master
 
 # Canaries are disabled by default, but if you want them,
 # and know what the downsides are, uncomment the `canary` job,
 # and uncomment the `when: manual` line in the `production` job.
 
-#canary:
-#  stage: canary
-#  script:
-#    - eval "$CHECK_KUBE_DOMAIN"
-#    - eval "$INSTALL_DEPENDENCIES"
-#    - eval "$DOWNLOAD_CHART"
-#    - eval "$ENSURE_NAMESPACE"
-#    - eval "$INSTALL_TILLER"
-#    - eval "$CREATE_SECRET"
-#    - deploy canary
-#  environment:
-#    name: production
-#    url: http://$CI_PROJECT_PATH_SLUG.$KUBE_DOMAIN
-#  when: manual
-#  only:
-#    - master
+.canary:
+  stage: canary
+  script:
+    - check_kube_domain
+    - install_dependencies
+    - download_chart
+    - ensure_namespace
+    - install_tiller
+    - create_secret
+    - deploy canary
+  environment:
+    name: production
+    url: http://$CI_PROJECT_PATH_SLUG.$KUBE_DOMAIN
+  when: manual
+  only:
+    # refs:
+    #   - master
+    # kubernetes: true
+    - master
 
 # This job continuously deploys to production on every push to `master`.
 # To make this a manual process, either because you're enabling `staging`
@@ -174,24 +184,43 @@ stop_review:
 production:
   stage: production
   script:
-    - eval "$CHECK_KUBE_DOMAIN"
-    - eval "$INSTALL_DEPENDENCIES"
-    - eval "$DOWNLOAD_CHART"
-    - eval "$ENSURE_NAMESPACE"
-    - eval "$INSTALL_TILLER"
-    - eval "$CREATE_SECRET"
+    - check_kube_domain
+    - install_dependencies
+    - download_chart
+    - ensure_namespace
+    - install_tiller
+    - create_secret
     - deploy
-    - eval "$DELETE_CANARY"
+    - delete canary
   environment:
     name: production
     url: http://$CI_PROJECT_PATH_SLUG.$KUBE_DOMAIN
 #  when: manual
   only:
+    # refs:
+    #   - master
+    # kubernetes: true
     - master
 
 # ---------------------------------------------------------------------------
 
-.fun_deploy: &fun_deploy |
+.auto_devops: &auto_devops |
+  # AutoDevOps variables
+  auto_database_url=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${CI_ENVIRONMENT_SLUG}-postgres:5432/${POSTGRES_DB}
+  DATABASE_URL=${DATABASE_URL-$auto_database_url}
+  CI_APPLICATION_REPOSITORY=$CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG
+  CI_APPLICATION_TAG=$CI_COMMIT_SHA
+  CI_CONTAINER_NAME=ci_job_build_${CI_JOB_ID}
+  TILLER_NAMESPACE=$KUBE_NAMESPACE
+
+  function codequality() {
+    docker run --env CODECLIMATE_CODE="$PWD" \
+      --volume "$PWD":/code \
+      --volume /var/run/docker.sock:/var/run/docker.sock \
+      --volume /tmp/cc:/tmp/cc \
+      codeclimate/codeclimate $@
+  }
+
   function deploy() {
     track="${1-stable}"
     name="$CI_ENVIRONMENT_SLUG"
@@ -246,19 +275,8 @@ production:
     fi
   }
 
-before_script:
-  - *fun_deploy
-
-variables:
-  <<: *configuration_variables
-
   # Auto-deploy scripts
-  CI_APPLICATION_REPOSITORY: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG
-  CI_APPLICATION_TAG: $CI_COMMIT_SHA
-  CI_CONTAINER_NAME: ci_job_build_${CI_JOB_ID}
-  TILLER_NAMESPACE: $KUBE_NAMESPACE
-
-  INSTALL_DEPENDENCIES: |
+  function install_dependencies() {
     apk add -U openssl curl tar gzip bash ca-certificates git
     wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://raw.githubusercontent.com/sgerrand/alpine-pkg-glibc/master/sgerrand.rsa.pub
     wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.23-r3/glibc-2.23-r3.apk
@@ -269,96 +287,112 @@ variables:
     mv linux-amd64/helm /usr/bin/
     helm version --client
 
-    curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$$(curl -s https://storage.googleapis.com/kubernetes-release/release/latest.txt)/bin/linux/amd64/kubectl
+    curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/latest.txt)/bin/linux/amd64/kubectl
     chmod +x /usr/bin/kubectl
     kubectl version --client
+  }
 
-  SETUP_DOCKER: |
+  function setup_docker() {
     if ! docker info &>/dev/null; then
-      if [ -z "$$DOCKER_HOST" -a "$$KUBERNETES_PORT" ]; then
+      if [ -z "$DOCKER_HOST" -a "$KUBERNETES_PORT" ]; then
         export DOCKER_HOST='tcp://localhost:2375'
       fi
     fi
+  }
 
-  SETUP_TEST_DB: |
-    if [ -z $${KUBERNETES_PORT+x} ]; then
+  function setup_test_db() {
+    if [ -z ${KUBERNETES_PORT+x} ]; then
       DB_HOST=postgres
     else
       DB_HOST=localhost
     fi
-    export DATABASE_URL="postgres://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@$${DB_HOST}:5432/$${POSTGRES_DB}"
+    export DATABASE_URL="postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST}:5432/${POSTGRES_DB}"
+  }
 
-  DOWNLOAD_CHART: |
+  function download_chart() {
     if [[ ! -d chart ]]; then
       helm init --client-only
       helm repo add gitlab https://charts.gitlab.io
-      helm fetch $${CHART_URL:-gitlab/auto-deploy-app} --untar
+      helm fetch ${CHART_URL:-gitlab/auto-deploy-app} --untar
       mv auto-deploy-app chart
     fi
     helm dependency update chart/
     helm dependency build chart/
+  }
 
-  ENSURE_NAMESPACE: |
-    kubectl describe namespace "$$KUBE_NAMESPACE" || kubectl create namespace "$$KUBE_NAMESPACE"
+  function ensure_namespace() {
+    kubectl describe namespace "$KUBE_NAMESPACE" || kubectl create namespace "$KUBE_NAMESPACE"
+  }
 
-  CHECK_KUBE_DOMAIN: |
-    if [ -z $${KUBE_DOMAIN+x} ]; then
+  function check_kube_domain() {
+    if [ -z ${KUBE_DOMAIN+x} ]; then
       echo "In order to deploy, KUBE_DOMAIN must be set as a variable at the group or project level, or manually added in .gitlab-cy.yml"
       false
     else
       true
     fi
+  }
 
-  BUILD_DOCKER: |
+  function build() {
     if [[ -f Dockerfile ]]; then
       echo "Building Dockerfile-based application..."
-      docker build -t "$$CI_APPLICATION_REPOSITORY:$$CI_APPLICATION_TAG" .
+      docker build -t "$CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG" .
     else
       echo "Building Heroku-based application using gliderlabs/herokuish docker image..."
-      docker run -i --name="$$CI_CONTAINER_NAME" -v "$$(pwd):/tmp/app:ro" gliderlabs/herokuish /bin/herokuish buildpack build
-      docker commit "$$CI_CONTAINER_NAME" "$$CI_APPLICATION_REPOSITORY:$$CI_APPLICATION_TAG"
-      docker rm "$$CI_CONTAINER_NAME" >/dev/null
+      docker run -i --name="$CI_CONTAINER_NAME" -v "$(pwd):/tmp/app:ro" gliderlabs/herokuish /bin/herokuish buildpack build
+      docker commit "$CI_CONTAINER_NAME" "$CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG"
+      docker rm "$CI_CONTAINER_NAME" >/dev/null
       echo ""
 
-      echo "Configuring $$CI_APPLICATION_REPOSITORY:$$CI_APPLICATION_TAG docker image..."
-      docker create --expose 5000 --env PORT=5000 --name="$$CI_CONTAINER_NAME" "$$CI_APPLICATION_REPOSITORY:$$CI_APPLICATION_TAG" /bin/herokuish procfile start web
-      docker commit "$$CI_CONTAINER_NAME" "$$CI_APPLICATION_REPOSITORY:$$CI_APPLICATION_TAG"
-      docker rm "$$CI_CONTAINER_NAME" >/dev/null
+      echo "Configuring $CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG docker image..."
+      docker create --expose 5000 --env PORT=5000 --name="$CI_CONTAINER_NAME" "$CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG" /bin/herokuish procfile start web
+      docker commit "$CI_CONTAINER_NAME" "$CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG"
+      docker rm "$CI_CONTAINER_NAME" >/dev/null
       echo ""
     fi
 
-    if [[ -n "$$CI_REGISTRY_USER" ]]; then
+    if [[ -n "$CI_REGISTRY_USER" ]]; then
       echo "Logging to GitLab Container Registry with CI credentials..."
-      docker login -u "$$CI_REGISTRY_USER" -p "$$CI_REGISTRY_PASSWORD" "$$CI_REGISTRY"
+      docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
       echo ""
     fi
 
     echo "Pushing to GitLab Container Registry..."
-    docker push "$$CI_APPLICATION_REPOSITORY:$$CI_APPLICATION_TAG"
+    docker push "$CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG"
     echo ""
+  }
 
-  INSTALL_TILLER: |
+  function install_tiller() {
     echo "Checking Tiller..."
     helm init --upgrade
-    kubectl rollout status -n "$$TILLER_NAMESPACE" -w "deployment/tiller-deploy"
+    kubectl rollout status -n "$TILLER_NAMESPACE" -w "deployment/tiller-deploy"
     if ! helm version --debug; then
       echo "Failed to init Tiller."
       return 1
     fi
     echo ""
+  }
 
-  CREATE_SECRET: |
-    kubectl create secret -n "$$KUBE_NAMESPACE" \
+  function create_secret() {
+    kubectl create secret -n "$KUBE_NAMESPACE" \
       docker-registry gitlab-registry \
-      --docker-server="$$CI_REGISTRY" \
-      --docker-username="$$CI_REGISTRY_USER" \
-      --docker-password="$$CI_REGISTRY_PASSWORD" \
-      --docker-email="$$GITLAB_USER_EMAIL" \
-      -o yaml --dry-run | kubectl replace -n "$$KUBE_NAMESPACE" --force -f -
+      --docker-server="$CI_REGISTRY" \
+      --docker-username="$CI_REGISTRY_USER" \
+      --docker-password="$CI_REGISTRY_PASSWORD" \
+      --docker-email="$GITLAB_USER_EMAIL" \
+      -o yaml --dry-run | kubectl replace -n "$KUBE_NAMESPACE" --force -f -
+  }
 
+  function delete() {
+    track="${1-stable}"
+    name="$CI_ENVIRONMENT_SLUG"
 
-  DELETE_CANARY: |
-    helm delete "$$CI_ENVIRONMENT_SLUG-canary" || true
+    if [[ "$track" != "stable" ]]; then
+      name="$name-$track"
+    fi
 
-  DELETE_FINAL: |
-    helm delete "$$CI_ENVIRONMENT_SLUG" || true
+    helm delete "$name" || true
+  }
+
+before_script:
+  - *auto_devops
