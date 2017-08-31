@@ -3,10 +3,10 @@
 require 'net/http'
 require 'json'
 
-uri = URI.parse 'https://gitlab.com/api/v4/ci/lint'
+LINTER_URI = URI.parse 'https://gitlab.com/api/v4/ci/lint'
 
-Dir.glob("#{File.dirname(__FILE__)}/**/*.yml").each do |file|
-  response = Net::HTTP.post_form(uri, content: File.read(file))
+def verify(file)
+  response = Net::HTTP.post_form(LINTER_URI, content: File.read(file))
 
   file = file.match(/((\w|\+|#)+)\.gitlab-ci/)[1]
 
@@ -18,6 +18,12 @@ Dir.glob("#{File.dirname(__FILE__)}/**/*.yml").each do |file|
   end
 end
 
-# Given we test all the templates, the coverage is 100%, always. To showcase
-# how this is done, we print it here.
-puts "Coverage: 100%"
+if ARGV.empty?
+  Dir.glob("#{File.dirname(__FILE__)}/**/*.yml").each { |file| verify(file) }
+
+  # Given we test all the templates, the coverage is 100%, always. To showcase
+  # how this is done, we print it here.
+  puts 'Coverage: 100%'
+else
+  verify(ARGV[0])
+end
