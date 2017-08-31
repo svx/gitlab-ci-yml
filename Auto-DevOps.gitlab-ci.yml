@@ -96,7 +96,7 @@ review:
     - eval "$ENSURE_NAMESPACE"
     - eval "$INSTALL_TILLER"
     - eval "$CREATE_SECRET"
-    - eval "$DEPLOY_FINAL"
+    - deploy
   environment:
     name: review/$CI_COMMIT_REF_NAME
     url: http://$CI_PROJECT_PATH_SLUG-$CI_ENVIRONMENT_SLUG.$KUBE_DOMAIN
@@ -138,7 +138,7 @@ stop_review:
 #    - eval "$ENSURE_NAMESPACE"
 #    - eval "$INSTALL_TILLER"
 #    - eval "$CREATE_SECRET"
-#    - eval "$DEPLOY_FINAL"
+#    - deploy
 #  environment:
 #    name: staging
 #    url: http://$CI_PROJECT_PATH_SLUG-staging.$KUBE_DOMAIN
@@ -158,7 +158,7 @@ stop_review:
 #    - eval "$ENSURE_NAMESPACE"
 #    - eval "$INSTALL_TILLER"
 #    - eval "$CREATE_SECRET"
-#    - eval "$DEPLOY_CANARY"
+#    - deploy canary
 #  environment:
 #    name: production
 #    url: http://$CI_PROJECT_PATH_SLUG.$KUBE_DOMAIN
@@ -180,7 +180,7 @@ production:
     - eval "$ENSURE_NAMESPACE"
     - eval "$INSTALL_TILLER"
     - eval "$CREATE_SECRET"
-    - eval "$DEPLOY_FINAL"
+    - deploy
     - eval "$DELETE_CANARY"
   environment:
     name: production
@@ -190,6 +190,64 @@ production:
     - master
 
 # ---------------------------------------------------------------------------
+
+.fun_deploy: &fun_deploy |
+  function deploy() {
+    track="${1-stable}"
+    name="$CI_ENVIRONMENT_SLUG"
+
+    if [[ "$track" != "stable" ]]; then
+      name="$name-$track"
+    fi
+
+    replicas="1"
+    service_enabled="false"
+    postgres_enabled="$POSTGRES_ENABLED"
+    # canary uses stable db
+    [[ "$track" == "canary" ]] && postgres_enabled="false"
+
+    env_track=$( echo $track | tr -s  '[:lower:]'  '[:upper:]' )
+    env_slug=$( echo ${CI_ENVIRONMENT_SLUG//-/_} | tr -s  '[:lower:]'  '[:upper:]' )
+
+    if [[ "$track" == "stable" ]]; then
+      # for stable track get number of replicas from `PRODUCTION_REPLICAS`
+      eval new_replicas=\$${env_slug}_REPLICAS
+      service_enabled="true"
+    else
+      # for all tracks get number of replicas from `CANARY_PRODUCTION_REPLICAS`
+      eval new_replicas=\$${env_track}_${env_slug}_REPLICAS
+    fi
+    if [[ -n "$new_replicas" ]]; then
+      replicas="$new_replicas"
+    fi
+
+    helm upgrade --install \
+      --wait \
+      --set service.enabled="$service_enabled" \
+      --set releaseOverride="$CI_ENVIRONMENT_SLUG" \
+      --set image.repository="$CI_APPLICATION_REPOSITORY" \
+      --set image.tag="$CI_APPLICATION_TAG" \
+      --set application.track="$track" \
+      --set application.database_url="$DATABASE_URL" \
+      --set service.url="$CI_ENVIRONMENT_URL" \
+      --set replicaCount="$replicas" \
+      --set postgresql.enabled="$postgres_enabled" \
+      --set postgresql.nameOverride="postgres" \
+      --set postgresql.postgresUser="$POSTGRES_USER" \
+      --set postgresql.postgresPassword="$POSTGRES_PASSWORD" \
+      --set postgresql.postgresDatabase="$POSTGRES_DB" \
+      --namespace="$KUBE_NAMESPACE" \
+      --version="$CI_PIPELINE_ID-$CI_JOB_ID" \
+      "$name" \
+      chart/
+
+    if [[ "$track" == "stable" ]]; then
+      kubectl rollout status -n "$KUBE_NAMESPACE" -w "deployment/${CI_ENVIRONMENT_SLUG}-auto-deploy"
+    fi
+  }
+
+before_script:
+  - *fun_deploy
 
 variables:
   <<: *configuration_variables
@@ -298,58 +356,6 @@ variables:
       --docker-email="$$GITLAB_USER_EMAIL" \
       -o yaml --dry-run | kubectl replace -n "$$KUBE_NAMESPACE" --force -f -
 
-  DEPLOY_FINAL: |
-    # TODO fix replicas
-    #env_slug="$${CI_ENVIRONMENT_SLUG//-/_}"
-    #env_slug="$${env_slug^^}"
-    #eval new_replicas=\$$$${env_slug}_REPLICAS
-    #if [[ -n "$$new_replicas" ]]; then
-    #  replicas="$$new_replicas"
-    #fi
-    helm upgrade --install \
-      --wait \
-      --set image.repository="$$CI_APPLICATION_REPOSITORY" \
-      --set image.tag="$$CI_APPLICATION_TAG" \
-      --set application.track="stable" \
-      --set application.database_url="$$DATABASE_URL" \
-      --set service.url="$$CI_ENVIRONMENT_URL" \
-      --set replicaCount="$$replicas" \
-      --set postgresql.enabled="$$POSTGRES_ENABLED" \
-      --set postgresql.nameOverride="postgres" \
-      --set postgresql.postgresUser="$$POSTGRES_USER" \
-      --set postgresql.postgresPassword="$$POSTGRES_PASSWORD" \
-      --set postgresql.postgresDatabase="$$POSTGRES_DB" \
-      --namespace="$$KUBE_NAMESPACE" \
-      --version="$$CI_PIPELINE_ID-$$CI_JOB_ID" \
-      "$$CI_ENVIRONMENT_SLUG" \
-      chart/
-
-    kubectl rollout status -n "$$KUBE_NAMESPACE" -w "deployment/$${CI_ENVIRONMENT_SLUG}-auto-deploy"
-
-  DEPLOY_CANARY: |
-    # TODO fix replicas
-    # env_track="$${track^^}"
-    # env_slug="$${CI_ENVIRONMENT_SLUG//-/_}"
-    # env_slug="$${env_slug^^}"
-    # eval new_replicas=\$$$${env_track}_$${env_slug}_REPLICAS
-    # if [[ -n "$$new_replicas" ]]; then
-    #   replicas="$$new_replicas"
-    # fi
-    helm upgrade --install \
-      --wait \
-      --set releaseOverride="$$CI_ENVIRONMENT_SLUG" \
-      --set image.repository="$$CI_APPLICATION_REPOSITORY" \
-      --set image.tag="$$CI_APPLICATION_TAG" \
-      --set application.track="canary" \
-      --set application.database_url="$$DATABASE_URL" \
-      --set replicaCount="$$replicas" \
-      --set service.enabled="false" \
-      --set service.url="$$CI_ENVIRONMENT_URL" \
-      --set postgresql.enabled="false" \
-      --namespace="$$KUBE_NAMESPACE" \
-      --version="$$CI_PIPELINE_ID-$$CI_JOB_ID" \
-      "$$CI_ENVIRONMENT_SLUG-canary" \
-      chart/
 
   DELETE_CANARY: |
     helm delete "$$CI_ENVIRONMENT_SLUG-canary" || true
