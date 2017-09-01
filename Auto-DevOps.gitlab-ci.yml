@@ -102,7 +102,7 @@ review:
   only:
     # refs:
     #   - branches
-    # kubernetes: true
+    # kubernetes: active
     - branches
   except:
     - master
@@ -122,7 +122,7 @@ stop_review:
   only:
     # refs:
     #   - branches
-    # kubernetes: true
+    # kubernetes: active
     - branches
   except:
     - master
@@ -154,7 +154,7 @@ stop_review:
   only:
     # refs:
     #   - master
-    # kubernetes: true
+    # kubernetes: active
     - master
 
 # Canaries are disabled by default, but if you want them,
@@ -178,7 +178,7 @@ stop_review:
   only:
     # refs:
     #   - master
-    # kubernetes: true
+    # kubernetes: active
     - master
 
 # This job continuously deploys to production on every push to `master`.
@@ -204,7 +204,7 @@ production:
   only:
     # refs:
     #   - master
-    # kubernetes: true
+    # kubernetes: active
     - master
 
 # ---------------------------------------------------------------------------
