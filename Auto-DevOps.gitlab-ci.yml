@@ -210,7 +210,7 @@ production:
 # ---------------------------------------------------------------------------
 
 .auto_devops: &auto_devops |
-  # AutoDevOps variables
+  # Auto DevOps variables and functions
   auto_database_url=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${CI_ENVIRONMENT_SLUG}-postgres:5432/${POSTGRES_DB}
   DATABASE_URL=${DATABASE_URL-$auto_database_url}
   CI_APPLICATION_REPOSITORY=$CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG
@@ -280,7 +280,6 @@ production:
     fi
   }
 
-  # Auto-deploy scripts
   function install_dependencies() {
     apk add -U openssl curl tar gzip bash ca-certificates git
     wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://raw.githubusercontent.com/sgerrand/alpine-pkg-glibc/master/sgerrand.rsa.pub
