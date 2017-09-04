@@ -70,7 +70,7 @@ test:
   only:
     - branches
 
-codeclimate:
+codequality:
   image: docker:latest
   variables:
     DOCKER_DRIVER: overlay2
@@ -207,11 +207,11 @@ production:
 .auto_devops: &auto_devops |
   # Auto DevOps variables and functions
   auto_database_url=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${CI_ENVIRONMENT_SLUG}-postgres:5432/${POSTGRES_DB}
-  DATABASE_URL=${DATABASE_URL-$auto_database_url}
-  CI_APPLICATION_REPOSITORY=$CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG
-  CI_APPLICATION_TAG=$CI_COMMIT_SHA
-  CI_CONTAINER_NAME=ci_job_build_${CI_JOB_ID}
-  TILLER_NAMESPACE=$KUBE_NAMESPACE
+  export DATABASE_URL=${DATABASE_URL-$auto_database_url}
+  export CI_APPLICATION_REPOSITORY=$CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG
+  export CI_APPLICATION_TAG=$CI_COMMIT_SHA
+  export CI_CONTAINER_NAME=ci_job_build_${CI_JOB_ID}
+  export TILLER_NAMESPACE=$KUBE_NAMESPACE
 
   function codequality() {
     docker run --env CODECLIMATE_CODE="$PWD" \
@@ -286,7 +286,7 @@ production:
     mv linux-amd64/helm /usr/bin/
     helm version --client
 
-    curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/latest.txt)/bin/linux/amd64/kubectl
+    curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
     chmod +x /usr/bin/kubectl
     kubectl version --client
   }
