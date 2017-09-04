@@ -314,8 +314,8 @@ production:
   }
 
   function download_chart() {
+    helm init --client-only
     if [[ ! -d chart ]]; then
-      helm init --client-only
       helm repo add gitlab https://charts.gitlab.io
       helm fetch ${CHART_URL:-gitlab/auto-deploy-app} --untar
       mv auto-deploy-app chart
