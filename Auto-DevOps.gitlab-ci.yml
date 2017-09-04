@@ -282,7 +282,7 @@ production:
     apk add glibc-2.23-r3.apk
     rm glibc-2.23-r3.apk
 
-    curl https://kubernetes-helm.storage.googleapis.com/helm-v2.5.0-linux-amd64.tar.gz | tar zx
+    curl https://kubernetes-helm.storage.googleapis.com/helm-v2.6.1-linux-amd64.tar.gz | tar zx
     mv linux-amd64/helm /usr/bin/
     helm version --client
 
@@ -309,8 +309,8 @@ production:
   }
 
   function download_chart() {
+    helm init --client-only
     if [[ ! -d chart ]]; then
-      helm init --client-only
       helm repo add gitlab https://charts.gitlab.io
       helm fetch ${CHART_URL:-gitlab/auto-deploy-app} --untar
       mv auto-deploy-app chart
