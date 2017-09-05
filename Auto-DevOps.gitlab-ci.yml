@@ -9,8 +9,8 @@
 #
 # In order to deploy, you must have a Kubernetes cluster configured either
 # via a project integration, or via group/project variables.
-# KUBE_DOMAIN must also be set as a variable at the group or project level,
-# or manually added below.
+# AUTO_DEVOPS_DOMAIN must also be set as a variable at the group or project
+# level, or manually added below.
 #
 # If you want to deploy to staging first, or enable canary deploys,
 # uncomment the relevant jobs in the pipeline below.
@@ -26,8 +26,8 @@
 image: alpine:latest
 
 variables:
-  # KUBE_DOMAIN is the application deployment domain and should be set as a variable at the group or project level.
-  # KUBE_DOMAIN: domain.example.com
+  # AUTO_DEVOPS_DOMAIN is the application deployment domain and should be set as a variable at the group or project level.
+  # AUTO_DEVOPS_DOMAIN: domain.example.com
 
   POSTGRES_USER: user
   POSTGRES_PASSWORD: testing-password
@@ -97,7 +97,7 @@ review:
     - deploy
   environment:
     name: review/$CI_COMMIT_REF_NAME
-    url: http://$CI_PROJECT_PATH_SLUG-$CI_ENVIRONMENT_SLUG.$KUBE_DOMAIN
+    url: http://$CI_PROJECT_PATH_SLUG-$CI_ENVIRONMENT_SLUG.$AUTO_DEVOPS_DOMAIN
     on_stop: stop_review
   only:
     # refs:
@@ -150,7 +150,7 @@ stop_review:
     - deploy
   environment:
     name: staging
-    url: http://$CI_PROJECT_PATH_SLUG-staging.$KUBE_DOMAIN
+    url: http://$CI_PROJECT_PATH_SLUG-staging.$AUTO_DEVOPS_DOMAIN
   only:
     # refs:
     #   - master
@@ -173,7 +173,7 @@ stop_review:
     - deploy canary
   environment:
     name: production
-    url: http://$CI_PROJECT_PATH_SLUG.$KUBE_DOMAIN
+    url: http://$CI_PROJECT_PATH_SLUG.$AUTO_DEVOPS_DOMAIN
   when: manual
   only:
     # refs:
@@ -199,7 +199,7 @@ production:
     - delete canary
   environment:
     name: production
-    url: http://$CI_PROJECT_PATH_SLUG.$KUBE_DOMAIN
+    url: http://$CI_PROJECT_PATH_SLUG.$AUTO_DEVOPS_DOMAIN
 #  when: manual
   only:
     # refs:
@@ -318,7 +318,7 @@ production:
     helm init --client-only
     if [[ ! -d chart ]]; then
       helm repo add gitlab https://charts.gitlab.io
-      helm fetch ${CHART_URL:-gitlab/auto-deploy-app} --untar
+      helm fetch ${AUTO_DEVOPS_CHART:-gitlab/auto-deploy-app} --untar
       mv auto-deploy-app chart
     fi
     helm dependency update chart/
@@ -330,8 +330,8 @@ production:
   }
 
   function check_kube_domain() {
-    if [ -z ${KUBE_DOMAIN+x} ]; then
-      echo "In order to deploy, KUBE_DOMAIN must be set as a variable at the group or project level, or manually added in .gitlab-cy.yml"
+    if [ -z ${AUTO_DEVOPS_DOMAIN+x} ]; then
+      echo "In order to deploy, AUTO_DEVOPS_DOMAIN must be set as a variable at the group or project level, or manually added in .gitlab-cy.yml"
       false
     else
       true
