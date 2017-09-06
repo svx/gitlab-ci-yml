@@ -100,10 +100,9 @@ review:
     url: http://$CI_PROJECT_PATH_SLUG-$CI_ENVIRONMENT_SLUG.$AUTO_DEVOPS_DOMAIN
     on_stop: stop_review
   only:
-    # refs:
-    #   - branches
-    # kubernetes: active
-    - branches
+    refs:
+      - branches
+    kubernetes: active
   except:
     - master
 
@@ -120,10 +119,9 @@ stop_review:
   when: manual
   allow_failure: true
   only:
-    # refs:
-    #   - branches
-    # kubernetes: active
-    - branches
+    refs:
+      - branches
+    kubernetes: active
   except:
     - master
 
@@ -152,10 +150,9 @@ stop_review:
     name: staging
     url: http://$CI_PROJECT_PATH_SLUG-staging.$AUTO_DEVOPS_DOMAIN
   only:
-    # refs:
-    #   - master
-    # kubernetes: active
-    - master
+    refs:
+      - master
+    kubernetes: active
 
 # Canaries are disabled by default, but if you want them,
 # and know what the downsides are, enable this job,
@@ -176,10 +173,9 @@ stop_review:
     url: http://$CI_PROJECT_PATH_SLUG.$AUTO_DEVOPS_DOMAIN
   when: manual
   only:
-    # refs:
-    #   - master
-    # kubernetes: active
-    - master
+    refs:
+      - master
+    kubernetes: active
 
 # This job continuously deploys to production on every push to `master`.
 # To make this a manual process, either because you're enabling `staging`
@@ -202,10 +198,9 @@ production:
     url: http://$CI_PROJECT_PATH_SLUG.$AUTO_DEVOPS_DOMAIN
 #  when: manual
   only:
-    # refs:
-    #   - master
-    # kubernetes: active
-    - master
+    refs:
+      - master
+    kubernetes: active
 
 # ---------------------------------------------------------------------------
 
