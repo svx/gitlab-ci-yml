@@ -79,9 +79,7 @@ codequality:
     - docker:dind
   script:
     - setup_docker
-    - docker pull codeclimate/codeclimate
-    - codequality init
-    - codequality analyze -f json > codeclimate.json
+    - codeclimate
   artifacts:
     paths: [codeclimate.json]
 
@@ -214,12 +212,14 @@ production:
   export CI_CONTAINER_NAME=ci_job_build_${CI_JOB_ID}
   export TILLER_NAMESPACE=$KUBE_NAMESPACE
 
-  function codequality() {
-    docker run --env CODECLIMATE_CODE="$PWD" \
-      --volume "$PWD":/code \
-      --volume /var/run/docker.sock:/var/run/docker.sock \
-      --volume /tmp/cc:/tmp/cc \
-      codeclimate/codeclimate "$@"
+  function codeclimate() {
+    cc_opts="--env CODECLIMATE_CODE="$PWD" \
+             --volume "$PWD":/code \
+             --volume /var/run/docker.sock:/var/run/docker.sock \
+             --volume /tmp/cc:/tmp/cc"
+
+    docker run ${cc_opts} codeclimate/codeclimate init
+    docker run ${cc_opts} codeclimate/codeclimate analyze -f json > codeclimate.json
   }
 
   function deploy() {
