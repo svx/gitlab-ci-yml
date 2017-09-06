@@ -123,7 +123,7 @@ stop_review:
   except:
     - master
 
-# Keys that start with a dot (.) will be not processed by GitLab CI.
+# Keys that start with a dot (.) will not be processed by GitLab CI.
 # Staging and canary jobs are disabled by default, to enable them
 # remove the dot (.) before the job name.
 # https://docs.gitlab.com/ee/ci/yaml/README.html#hidden-keys
@@ -131,7 +131,7 @@ stop_review:
 # Staging deploys are disabled by default since
 # continuous deployment to production is enabled by default
 # If you prefer to automatically deploy to staging and
-# only manually promote to production, enable this job,
+# only manually promote to production, enable this job by removing the dot (.),
 # and uncomment the `when: manual` line in the `production` job.
 
 .staging:
@@ -153,7 +153,7 @@ stop_review:
     kubernetes: active
 
 # Canaries are disabled by default, but if you want them,
-# and know what the downsides are, enable this job,
+# and know what the downsides are, enable this job by removing the dot (.),
 # and uncomment the `when: manual` line in the `production` job.
 
 .canary:
