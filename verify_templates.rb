@@ -23,6 +23,7 @@ if ARGV.empty?
 
   # Given we test all the templates, the coverage is 100%, always. To showcase
   # how this is done, we print it here.
+  # Regexp used to parse this: Coverage:\s(\d+)
   puts 'Coverage: 100%'
 else
   verify(ARGV[0])
