@@ -7,8 +7,8 @@
 # This template will build and test your projects as well as create the documentation.
 #
 # * Caches downloaded dependencies and plugins between invocation.
-# * Does only verify merge requests but deploy built artifacts of the
-#   master branch.
+# * Verify but don't deploy merge requests.
+# * Deploy built artifacts from master branch only.
 # * Shows how to use multiple jobs in test stage for verifying functionality
 #   with multiple JDKs.
 # * Uses site:stage to collect the documentation for multi-module projects.
