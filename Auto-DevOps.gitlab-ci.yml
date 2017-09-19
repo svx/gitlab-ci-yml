@@ -253,6 +253,7 @@ production:
 
     helm upgrade --install \
       --wait \
+      --set nameOverride="auto-deploy"
       --set service.enabled="$service_enabled" \
       --set releaseOverride="$CI_ENVIRONMENT_SLUG" \
       --set image.repository="$CI_APPLICATION_REPOSITORY" \
