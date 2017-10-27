@@ -1,0 +1,36 @@
+# Official ChefDK Docker image
+image: "chef/chefdk"
+
+before_script:
+  - apt-get update
+  - apt-get install -y apt-transport-https ca-certificates curl software-properties-common
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+  - add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+  - apt-get update
+  - apt-get install -y docker-ce
+  - service docker start
+  - eval "$(/opt/chefdk/bin/chef shell-init bash)"
+
+stages:
+  - unit
+  - functional
+
+delivery_local:
+  stage: unit
+  variables:
+    UNIT_AND_LINT: "1"
+  script:
+    - /opt/chefdk/bin/chef exec delivery local all
+
+# Create a verify stage for each functional test phase you want to
+# run in parallel. For example you can run all CentOS tests in parallel with
+# all Debian phases.
+verify-centos:
+  stage: functional
+  script:
+  - KITCHEN_LOCAL_YAML=.kitchen.dokken.yml kitchen verify centos
+  
+verify-debian:
+  stage: functional
+  script:
+  - KITCHEN_LOCAL_YAML=.kitchen.dokken.yml kitchen verify debian
