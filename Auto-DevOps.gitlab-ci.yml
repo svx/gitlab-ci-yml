@@ -412,7 +412,9 @@ production:
       name="$name-$track"
     fi
 
-    helm delete "$name" || true
+    if [[ -n "$(helm ls -q "^$name$")" ]]; then
+      helm delete "$name"
+    fi
   }
 
 before_script:
