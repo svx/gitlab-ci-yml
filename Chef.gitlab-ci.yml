@@ -31,7 +31,7 @@ cookstyle:
 chefspec:
   stage: unit
   script:
-  - chef exec rspec .
+  - chef exec rspec spec
 
 # Set up your test matrix here. Example:
 #verify-centos-6:
