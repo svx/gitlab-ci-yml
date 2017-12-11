@@ -83,6 +83,37 @@ codequality:
   artifacts:
     paths: [codeclimate.json]
 
+performance:
+  stage: test
+  image: docker:git
+  variables:
+    DOCKER_DRIVER: overlay2
+  services:
+    - docker:dind
+  script:
+    - check_kube_domain
+    - install_dependencies
+    - download_chart
+    - ensure_namespace
+    - install_tiller
+    - create_secret
+    - deploy
+    - setup_docker
+    - performance
+    - delete
+  environment:
+    name: performance/$CI_COMMIT_REF_NAME
+    url: https://$CI_PROJECT_PATH_SLUG-$CI_ENVIRONMENT_SLUG.$AUTO_DEVOPS_DOMAIN
+    action: stop
+  artifacts:
+    paths:
+    - performance.json
+    - sitespeed-results/
+  only:
+    refs:
+      - branches
+    kubernetes: active
+
 sast:
   image: registry.gitlab.com/gitlab-org/gl-sast:latest
   variables:
