@@ -1,3 +1,4 @@
+# This file is a template, and might need editing before it works on your project.
 # Auto DevOps
 # This CI/CD configuration provides a standard pipeline for
 # * building a Docker image (using a buildpack if necessary),
@@ -77,21 +78,12 @@ codequality:
   allow_failure: true
   services:
     - docker:dind
+  stage: test
   script:
     - setup_docker
     - codeclimate
   artifacts:
     paths: [codeclimate.json]
-
-sast:
-  image: registry.gitlab.com/gitlab-org/gl-sast:latest
-  variables:
-    POSTGRES_DB: "false"
-  allow_failure: true
-  script:
-    - /app/bin/run .
-  artifacts:
-    paths: [gl-sast-report.json]
 
 review:
   stage: review
@@ -113,7 +105,7 @@ review:
     kubernetes: active
   except:
     - master
-
+    
 stop_review:
   stage: cleanup
   variables:
@@ -132,6 +124,37 @@ stop_review:
     kubernetes: active
   except:
     - master
+    
+performance:
+  stage: test
+  image: docker:git
+  variables:
+    DOCKER_DRIVER: overlay2
+  services:
+    - docker:dind
+  script:
+    - check_kube_domain
+    - install_dependencies
+    - download_chart
+    - ensure_namespace
+    - install_tiller
+    - create_secret
+    - deploy
+    - setup_docker
+    - performance
+    - delete
+  environment:
+    name: performance/$CI_COMMIT_REF_NAME
+    url: https://$CI_PROJECT_PATH_SLUG-$CI_ENVIRONMENT_SLUG.$AUTO_DEVOPS_DOMAIN
+    action: stop
+  artifacts:
+    paths:
+    - performance.json
+    - sitespeed-results/
+  only:
+    refs:
+      - branches
+    kubernetes: active
 
 # Keys that start with a dot (.) will not be processed by GitLab CI.
 # Staging and canary jobs are disabled by default, to enable them
@@ -284,7 +307,7 @@ production:
   }
 
   function install_dependencies() {
-    apk add -U openssl curl tar gzip bash ca-certificates git
+    apk add -U openssl curl tar gzip bash ca-certificates git gettext
     wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://raw.githubusercontent.com/sgerrand/alpine-pkg-glibc/master/sgerrand.rsa.pub
     wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.23-r3/glibc-2.23-r3.apk
     apk add glibc-2.23-r3.apk
@@ -355,13 +378,6 @@ production:
   }
 
   function build() {
-
-    if [[ -n "$CI_REGISTRY_USER" ]]; then
-      echo "Logging to GitLab Container Registry with CI credentials..."
-      docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
-      echo ""
-    fi
-
     if [[ -f Dockerfile ]]; then
       echo "Building Dockerfile-based application..."
       docker build -t "$CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG" .
@@ -376,6 +392,12 @@ production:
       docker create --expose 5000 --env PORT=5000 --name="$CI_CONTAINER_NAME" "$CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG" /bin/herokuish procfile start web
       docker commit "$CI_CONTAINER_NAME" "$CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG"
       docker rm "$CI_CONTAINER_NAME" >/dev/null
+      echo ""
+    fi
+
+    if [[ -n "$CI_REGISTRY_USER" ]]; then
+      echo "Logging to GitLab Container Registry with CI credentials..."
+      docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
       echo ""
     fi
 
@@ -404,6 +426,25 @@ production:
       --docker-email="$GITLAB_USER_EMAIL" \
       -o yaml --dry-run | kubectl replace -n "$KUBE_NAMESPACE" --force -f -
   }
+  
+  function performance() {
+    docker pull sitespeedio/sitespeed.io:6.0.3
+    
+    mkdir gitlab-exporter
+    curl -o ./gitlab-exporter/index.js https://gitlab.com/joshlambert/gitlab-exporter/raw/master/index.js
+    
+    mkdir sitespeed-results
+    
+    if [ -f .gitlab-urls.txt ]
+    then
+      envsubst < ".gitlab-urls.txt" > ".gitlab-urls-processed.txt"
+      docker run --shm-size=1g --rm -v "$(pwd)":/sitespeed.io sitespeedio/sitespeed.io:6.0.3 --plugins.add ./gitlab-exporter --outputFolder sitespeed-results .gitlab-urls-processed.txt
+    else
+      docker run --shm-size=1g --rm -v "$(pwd)":/sitespeed.io sitespeedio/sitespeed.io:6.0.3 --plugins.add ./gitlab-exporter --outputFolder sitespeed-results http://$CI_PROJECT_PATH_SLUG-$CI_ENVIRONMENT_SLUG.$AUTO_DEVOPS_DOMAIN/
+    fi
+    
+    mv sitespeed-results/data/performance.json performance.json
+  }
 
   function delete() {
     track="${1-stable}"
@@ -413,9 +454,7 @@ production:
       name="$name-$track"
     fi
 
-    if [[ -n "$(helm ls -q "^$name$")" ]]; then
-      helm delete "$name"
-    fi
+    helm delete "$name" || true
   }
 
 before_script:
