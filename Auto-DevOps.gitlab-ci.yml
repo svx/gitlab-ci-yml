@@ -440,7 +440,7 @@ production:
     docker pull sitespeedio/sitespeed.io:6.0.3
     
     mkdir gitlab-exporter
-    curl -o ./gitlab-exporter/index.js https://gitlab.com/joshlambert/gitlab-exporter/raw/master/index.js
+    curl -o ./gitlab-exporter/index.js https://gitlab.com/gitlab-org/gl-performance/raw/master/index.js
     
     mkdir sitespeed-results
     
