@@ -121,7 +121,8 @@ performance_manual:
     refs:
       - branches
     kubernetes: active
-  except: master
+  except: 
+    - master
 
 sast:
   image: registry.gitlab.com/gitlab-org/gl-sast:latest
