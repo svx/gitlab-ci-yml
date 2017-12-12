@@ -83,7 +83,7 @@ codequality:
   artifacts:
     paths: [codeclimate.json]
 
-performance:
+performance: &performance
   stage: test
   image: docker:git
   variables:
@@ -109,10 +109,19 @@ performance:
     paths:
     - performance.json
     - sitespeed-results/
+  when: manual
+  only:
+    refs:
+      - master
+    kubernetes: active
+    
+performance_manual:
+  <<: *performance
   only:
     refs:
       - branches
     kubernetes: active
+  except: master
 
 sast:
   image: registry.gitlab.com/gitlab-org/gl-sast:latest
