@@ -41,6 +41,7 @@ stages:
   - staging
   - canary
   - production
+  - performance
   - cleanup
 
 build:
@@ -83,28 +84,17 @@ codequality:
   artifacts:
     paths: [codeclimate.json]
 
-performance: &performance
-  stage: test
+performance:
+  stage: performance
   image: docker:git
   variables:
     DOCKER_DRIVER: overlay2
   services:
     - docker:dind
   script:
-    - check_kube_domain
     - install_dependencies
-    - download_chart
-    - ensure_namespace
-    - install_tiller
-    - create_secret
-    - deploy
     - setup_docker
     - performance
-    - delete
-  environment:
-    name: performance/$CI_COMMIT_REF_NAME
-    url: https://$CI_PROJECT_PATH_SLUG-$CI_ENVIRONMENT_SLUG.$AUTO_DEVOPS_DOMAIN
-    action: stop
   artifacts:
     paths:
     - performance.json
@@ -112,17 +102,8 @@ performance: &performance
   when: manual
   only:
     refs:
-      - master
-    kubernetes: active
-    
-performance_manual:
-  <<: *performance
-  only:
-    refs:
       - branches
     kubernetes: active
-  except: 
-    - master
 
 sast:
   image: registry.gitlab.com/gitlab-org/gl-sast:latest
@@ -144,10 +125,13 @@ review:
     - install_tiller
     - create_secret
     - deploy
+    - persist_environment_url
   environment:
     name: review/$CI_COMMIT_REF_NAME
     url: http://$CI_PROJECT_PATH_SLUG-$CI_ENVIRONMENT_SLUG.$AUTO_DEVOPS_DOMAIN
     on_stop: stop_review
+  artifacts:
+    paths: [environment_url.txt]
   only:
     refs:
       - branches
@@ -242,9 +226,12 @@ production:
     - create_secret
     - deploy
     - delete canary
+    - persist_environment_url
   environment:
     name: production
     url: http://$CI_PROJECT_PATH_SLUG.$AUTO_DEVOPS_DOMAIN
+  artifacts:
+    paths: [environment_url.txt]
 #  when: manual
   only:
     refs:
@@ -447,6 +434,8 @@ production:
   }
   
   function performance() {
+    export CI_ENVIRONMENT_URL=$(cat environment_url.txt)
+    
     docker pull sitespeedio/sitespeed.io:latest
     
     mkdir gitlab-exporter
@@ -456,13 +445,17 @@ production:
     
     if [ -f .gitlab-urls.txt ]
     then
-      envsubst < ".gitlab-urls.txt" > ".gitlab-urls-processed.txt"
+      envsubst '$CI_ENVIRONMENT_URL' < ".gitlab-urls.txt" > ".gitlab-urls-processed.txt"
       docker run --shm-size=1g --rm -v "$(pwd)":/sitespeed.io sitespeedio/sitespeed.io:latest --plugins.add ./gitlab-exporter --outputFolder sitespeed-results .gitlab-urls-processed.txt
     else
-      docker run --shm-size=1g --rm -v "$(pwd)":/sitespeed.io sitespeedio/sitespeed.io:latest --plugins.add ./gitlab-exporter --outputFolder sitespeed-results http://$CI_PROJECT_PATH_SLUG-$CI_ENVIRONMENT_SLUG.$AUTO_DEVOPS_DOMAIN/
+      docker run --shm-size=1g --rm -v "$(pwd)":/sitespeed.io sitespeedio/sitespeed.io:latest --plugins.add ./gitlab-exporter --outputFolder sitespeed-results http://$CI_ENVIRONMENT_URL/
     fi
     
     mv sitespeed-results/data/performance.json performance.json
+  }
+  
+  function persist_environment_url() {
+      echo $CI_ENVIRONMENT_URL > environment_url.txt
   }
 
   function delete() {
