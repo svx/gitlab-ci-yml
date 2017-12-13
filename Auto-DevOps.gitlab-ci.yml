@@ -99,7 +99,6 @@ performance:
     paths:
     - performance.json
     - sitespeed-results/
-  when: manual
   only:
     refs:
       - branches
