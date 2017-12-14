@@ -86,19 +86,14 @@ codequality:
 
 performance:
   stage: performance
-  image: docker:git
-  variables:
-    DOCKER_DRIVER: overlay2
-  services:
-    - docker:dind
+  image: 
+    name: sitespeedio/sitespeed.io:6.0.3
+    entrypoint: [""]
   script:
-    - install_dependencies
-    - setup_docker
     - performance
   artifacts:
     paths:
     - performance.json
-    - sitespeed-results/
   only:
     refs:
       - branches
@@ -435,19 +430,17 @@ production:
   function performance() {
     export CI_ENVIRONMENT_URL=$(cat environment_url.txt)
     
-    docker pull sitespeedio/sitespeed.io:latest
-    
     mkdir gitlab-exporter
-    curl -o ./gitlab-exporter/index.js https://gitlab.com/gitlab-org/gl-performance/raw/master/index.js
+    wget -q -O /gitlab-exporter/index.js https://gitlab.com/gitlab-org/gl-performance/raw/master/index.js
     
     mkdir sitespeed-results
     
     if [ -f .gitlab-urls.txt ]
     then
-      envsubst '$CI_ENVIRONMENT_URL' < ".gitlab-urls.txt" > ".gitlab-urls-processed.txt"
-      docker run --shm-size=1g --rm -v "$(pwd)":/sitespeed.io sitespeedio/sitespeed.io:latest --plugins.add ./gitlab-exporter --outputFolder sitespeed-results .gitlab-urls-processed.txt
+      sed -i -e 's@^@'"$CI_ENVIRONMENT_URL"'@' .gitlab-urls.txt
+      /start.sh --plugins.add gitlab-exporter --outputFolder sitespeed-results .gitlab-urls.txt
     else
-      docker run --shm-size=1g --rm -v "$(pwd)":/sitespeed.io sitespeedio/sitespeed.io:latest --plugins.add ./gitlab-exporter --outputFolder sitespeed-results http://$CI_ENVIRONMENT_URL/
+      /start.sh --plugins.add gitlab-exporter --outputFolder sitespeed-results http://$CI_ENVIRONMENT_URL/
     fi
     
     mv sitespeed-results/data/performance.json performance.json
