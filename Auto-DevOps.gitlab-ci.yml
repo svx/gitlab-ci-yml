@@ -431,7 +431,7 @@ production:
     export CI_ENVIRONMENT_URL=$(cat environment_url.txt)
     
     mkdir gitlab-exporter
-    wget -O https://gitlab.com/gitlab-org/gl-performance/raw/10-3/index.js gitlab-exporter/index.js
+    wget -O gitlab-exporter/index.js https://gitlab.com/gitlab-org/gl-performance/raw/10-3/index.js
     
     mkdir sitespeed-results
     
