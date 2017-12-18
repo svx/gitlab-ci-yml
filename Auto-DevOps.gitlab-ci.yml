@@ -238,7 +238,7 @@ production:
   function sast_image() {
     docker run -d --name db arminc/clair-db:latest
     docker run -p 6060:6060 --link db:postgres -d --name clair arminc/clair-local-scan:v2.0.1
-    apk update && apk add ca-certificates wget && update-ca-certificates
+    apk add -U wget ca-certificates
     docker pull ${CI_APPLICATION_REPOSITORY}:${CI_APPLICATION_TAG}
     wget https://github.com/arminc/clair-scanner/releases/download/v6/clair-scanner_linux_386
     mv clair-scanner_linux_386 clair-scanner
