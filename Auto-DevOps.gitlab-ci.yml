@@ -38,6 +38,7 @@ stages:
   - build
   - test
   - review
+  - dast
   - staging
   - canary
   - production
@@ -123,7 +124,7 @@ sast:container:
     paths: [gl-sast-container-report.json]
     
 dast:
-  stage: review
+  stage: dast
   allow_failure: true
   image: owasp/zap2docker-stable
   variables:
@@ -134,6 +135,12 @@ dast:
     - cp /zap/wrk/gl-dast-report.json .
   artifacts:
     paths: [gl-dast-report.json]
+  only:
+    refs:
+      - branches
+    kubernetes: active
+  except:
+    - master
 
 review:
   stage: review
