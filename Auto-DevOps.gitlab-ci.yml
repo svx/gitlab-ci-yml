@@ -42,6 +42,7 @@ stages:
   - build
   - test
   - review
+  - dast
   - staging
   - canary
   - production
@@ -125,6 +126,25 @@ sast:container:
     - sast_container
   artifacts:
     paths: [gl-sast-container-report.json]
+    
+dast:
+  stage: dast
+  allow_failure: true
+  image: owasp/zap2docker-stable
+  variables:
+    POSTGRES_DB: "false"
+  script:
+    - mkdir /zap/wrk/
+    - /zap/zap-baseline.py -J gl-dast-report.json -t http://$CI_PROJECT_PATH_SLUG-$CI_ENVIRONMENT_SLUG.$AUTO_DEVOPS_DOMAIN || true
+    - cp /zap/wrk/gl-dast-report.json .
+  artifacts:
+    paths: [gl-dast-report.json]
+  only:
+    refs:
+      - branches
+    kubernetes: active
+  except:
+    - master
 
 review:
   stage: review
