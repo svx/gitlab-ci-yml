@@ -478,13 +478,23 @@ production:
   }
 
   function create_secret() {
-    kubectl create secret -n "$KUBE_NAMESPACE" \
+    project_visibility=${CI_PROJECT_VISIBILITY}
+
+    if [[ "$project_visibility" != "public" ]]; then
+      kubectl create secret -n "$KUBE_NAMESPACE" \
       docker-registry gitlab-registry \
       --docker-server="$CI_REGISTRY" \
       --docker-username="$CI_REGISTRY_USER" \
       --docker-password="$CI_REGISTRY_PASSWORD" \
       --docker-email="$GITLAB_USER_EMAIL" \
       -o yaml --dry-run | kubectl replace -n "$KUBE_NAMESPACE" --force -f -
+
+      helm upgrade --install \
+        --set image.secrets={name:gitlab-registry}
+    else
+      helm upgrade --install \
+        --set image.secrets={}
+    fi
   }
   
   function performance() {
