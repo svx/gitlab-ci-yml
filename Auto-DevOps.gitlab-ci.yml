@@ -134,9 +134,7 @@ dast:
   variables:
     POSTGRES_DB: "false"
   script:
-    - mkdir /zap/wrk/
-    - /zap/zap-baseline.py -J gl-dast-report.json -t http://$CI_PROJECT_PATH_SLUG-$CI_ENVIRONMENT_SLUG.$AUTO_DEVOPS_DOMAIN || true
-    - cp /zap/wrk/gl-dast-report.json .
+    - dast
   artifacts:
     paths: [gl-dast-report.json]
   only:
@@ -485,6 +483,14 @@ production:
       --docker-password="$CI_REGISTRY_PASSWORD" \
       --docker-email="$GITLAB_USER_EMAIL" \
       -o yaml --dry-run | kubectl replace -n "$KUBE_NAMESPACE" --force -f -
+  }
+  
+  function dast() {
+    export CI_ENVIRONMENT_URL=$(cat environment_url.txt)
+      
+    mkdir /zap/wrk/
+    /zap/zap-baseline.py -J gl-dast-report.json -t $CI_ENVIRONMENT_URL || true
+    cp /zap/wrk/gl-dast-report.json .
   }
 
   function performance() {
