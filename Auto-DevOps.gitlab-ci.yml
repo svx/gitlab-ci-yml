@@ -489,7 +489,7 @@ production:
     export CI_ENVIRONMENT_URL=$(cat environment_url.txt)
       
     mkdir /zap/wrk/
-    /zap/zap-baseline.py -J gl-dast-report.json -t $CI_ENVIRONMENT_URL || true
+    /zap/zap-baseline.py -J gl-dast-report.json -t "$CI_ENVIRONMENT_URL" || true
     cp /zap/wrk/gl-dast-report.json .
   }
 
