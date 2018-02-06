@@ -284,6 +284,12 @@ production:
   export TILLER_NAMESPACE=$KUBE_NAMESPACE
 
   function sast_container() {
+    if [[ -n "$CI_REGISTRY_USER" ]]; then
+      echo "Logging to GitLab Container Registry with CI credentials..."
+      docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+      echo ""
+    fi
+
     docker run -d --name db arminc/clair-db:latest
     docker run -p 6060:6060 --link db:postgres -d --name clair arminc/clair-local-scan:v2.0.1
     apk add -U wget ca-certificates
