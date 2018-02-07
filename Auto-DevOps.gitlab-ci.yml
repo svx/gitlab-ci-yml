@@ -109,12 +109,15 @@ performance:
     kubernetes: active
 
 sast:
-  image: registry.gitlab.com/gitlab-org/gl-sast:latest
+  image: docker:latest
   variables:
-    POSTGRES_DB: "false"
+    DOCKER_DRIVER: overlay2
   allow_failure: true
+  services:
+    - docker:dind
   script:
-    - sast .
+    - setup_docker
+    - sast
   artifacts:
     paths: [gl-sast-report.json]
 
@@ -314,7 +317,12 @@ production:
   function sast() {
     case "$CI_SERVER_VERSION" in
       *-ee)
-        /app/bin/run "$@"
+        # Extract "MAJOR.MINOR" from CI_SERVER_VERSION and generate "MAJOR-MINOR-stable"
+        SAST_VERSION=$(echo "$CI_SERVER_VERSION" | sed 's/^\([0-9]*\)\.\([0-9]*\).*/\1-\2-stable/')
+
+        docker run --volume "$PWD:/code" \
+                   --volume /var/run/docker.sock:/var/run/docker.sock \
+                   "registry.gitlab.com/gitlab-org/security-products/sast:$SAST_VERSION" /app/bin/run /code
         ;;
       *)
         echo "GitLab EE is required"
@@ -497,7 +505,7 @@ production:
     if [[ "$CI_PROJECT_VISIBILITY" == "public" ]]; then
       return
     fi
-    
+
     kubectl create secret -n "$KUBE_NAMESPACE" \
       docker-registry gitlab-registry \
       --docker-server="$CI_REGISTRY" \
@@ -506,10 +514,10 @@ production:
       --docker-email="$GITLAB_USER_EMAIL" \
       -o yaml --dry-run | kubectl replace -n "$KUBE_NAMESPACE" --force -f -
   }
-  
+
   function dast() {
     export CI_ENVIRONMENT_URL=$(cat environment_url.txt)
-      
+
     mkdir /zap/wrk/
     /zap/zap-baseline.py -J gl-dast-report.json -t "$CI_ENVIRONMENT_URL" || true
     cp /zap/wrk/gl-dast-report.json .
