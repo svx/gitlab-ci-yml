@@ -2,3 +2,10 @@ image: ruby:2.4-alpine
 
 test:
   script: ./verify_templates.rb
+
+Auto-DevOps shellcheck:
+  before_script:
+    - apk add -U --no-cache openssl xz
+    - wget https://storage.googleapis.com/shellcheck/shellcheck-latest.linux.x86_64.tar.xz -O - | tar xvJ
+    - mv shellcheck-latest/shellcheck /usr/local/bin/
+  script: ./verify_auto_devops.rb
