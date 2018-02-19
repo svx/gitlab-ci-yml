@@ -286,7 +286,7 @@ production:
   export CI_CONTAINER_NAME=ci_job_build_${CI_JOB_ID}
   export TILLER_NAMESPACE=$KUBE_NAMESPACE
   # Extract "MAJOR.MINOR" from CI_SERVER_VERSION and generate "MAJOR-MINOR-stable" for Static Code Analysis
-  SCA_VERSION=$(echo "$CI_SERVER_VERSION" | sed 's/^\([0-9]*\)\.\([0-9]*\).*/\1-\2-stable/')
+  export SCA_VERSION=$(echo "$CI_SERVER_VERSION" | sed 's/^\([0-9]*\)\.\([0-9]*\).*/\1-\2-stable/')
 
   function sast_container() {
     if [[ -n "$CI_REGISTRY_USER" ]]; then
