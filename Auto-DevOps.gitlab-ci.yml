@@ -307,12 +307,11 @@ production:
   }
 
   function codeclimate() {
-    cc_opts="--env CODECLIMATE_CODE="$PWD" \
-             --volume "$PWD":/code \
-             --volume /var/run/docker.sock:/var/run/docker.sock \
-             --volume /tmp/cc:/tmp/cc"
-
-   docker run ${cc_opts} "registry.gitlab.com/gitlab-org/security-products/codequality/codeclimate:${SCA_VERSION}" analyze -f json > codeclimate.json
+    docker run --env CODECLIMATE_CODE="$PWD" \
+               --volume "$PWD":/code \
+               --volume /var/run/docker.sock:/var/run/docker.sock \
+               --volume /tmp/cc:/tmp/cc" \
+               "registry.gitlab.com/gitlab-org/security-products/codequality/codeclimate:${SCA_VERSION}" analyze -f json > codeclimate.json
   }
 
   function sast() {
