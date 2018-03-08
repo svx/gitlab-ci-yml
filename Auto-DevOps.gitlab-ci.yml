@@ -50,9 +50,9 @@ stages:
 
 build:
   stage: build
-  image: docker:git
+  image: docker:stable-git
   services:
-  - docker:dind
+  - docker:stable-dind
   variables:
     DOCKER_DRIVER: overlay2
   script:
@@ -76,12 +76,12 @@ test:
     - branches
 
 codequality:
-  image: docker:latest
+  image: docker:stable
   variables:
     DOCKER_DRIVER: overlay2
   allow_failure: true
   services:
-    - docker:dind
+    - docker:stable-dind
   script:
     - setup_docker
     - codeclimate
@@ -90,12 +90,12 @@ codequality:
 
 performance:
   stage: performance
-  image: docker:latest
+  image: docker:stable
   variables:
     DOCKER_DRIVER: overlay2
   allow_failure: true
   services:
-    - docker:dind
+    - docker:stable-dind
   script:
     - setup_docker
     - performance
@@ -109,12 +109,12 @@ performance:
     kubernetes: active
 
 sast:
-  image: docker:latest
+  image: docker:stable
   variables:
     DOCKER_DRIVER: overlay2
   allow_failure: true
   services:
-    - docker:dind
+    - docker:stable-dind
   script:
     - setup_docker
     - sast
@@ -122,24 +122,24 @@ sast:
     paths: [gl-sast-report.json]
 
 dependency_scanning:
-  image: docker:latest
+  image: docker:stable
   variables:
     DOCKER_DRIVER: overlay2
   allow_failure: true
   services:
-    - docker:dind
+    - docker:stable-dind
   script:
     - setup_docker
     - dependency_scanning
   artifacts:
     paths: [gl-dependency-scanning-report.json]
 sast:container:
-  image: docker:latest
+  image: docker:stable
   variables:
     DOCKER_DRIVER: overlay2
   allow_failure: true
   services:
-    - docker:dind
+    - docker:stable-dind
   script:
     - setup_docker
     - sast_container
