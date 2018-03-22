@@ -121,6 +121,18 @@ sast:
   artifacts:
     paths: [gl-sast-report.json]
 
+dependency_scanning:
+  image: docker:latest
+  variables:
+    DOCKER_DRIVER: overlay2
+  allow_failure: true
+  services:
+    - docker:dind
+  script:
+    - setup_docker
+    - dependency_scanning
+  artifacts:
+    paths: [gl-dependency-scanning-report.json]
 sast:container:
   image: docker:latest
   variables:
@@ -324,10 +336,23 @@ production:
         fi
 
         docker run --env SAST_CONFIDENCE_LEVEL="${SAST_CONFIDENCE_LEVEL:-3}" \
-                   --env SAST_DISABLE_REMOTE_CHECKS="${SAST_DISABLE_REMOTE_CHECKS:-false}" \
                    --volume "$PWD:/code" \
                    --volume /var/run/docker.sock:/var/run/docker.sock \
                    "registry.gitlab.com/gitlab-org/security-products/sast:$SP_VERSION" /app/bin/run /code
+        ;;
+      *)
+        echo "GitLab EE is required"
+        ;;
+    esac
+  }
+
+  function dependency_scanning() {
+    case "$CI_SERVER_VERSION" in
+      *-ee)
+        docker run --env DEP_SCAN_DISABLE_REMOTE_CHECKS="${DEP_SCAN_DISABLE_REMOTE_CHECKS:-false}" \
+                   --volume "$PWD:/code" \
+                   --volume /var/run/docker.sock:/var/run/docker.sock \
+                   "registry.gitlab.com/gitlab-org/security-products/dependency-scanning:$SP_VERSION" /code
         ;;
       *)
         echo "GitLab EE is required"
