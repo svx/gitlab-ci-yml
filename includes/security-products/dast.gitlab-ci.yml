@@ -9,10 +9,10 @@ dast:
     - docker:stable-dind
   variables:
     DOCKER_DRIVER: overlay2
-    website: "https://example.com"
   script:
+    - if [ -z $DAST_WEB_SITE ]; then echo "Please configure DAST_WEB_SITE env variable" && exit 1; fi
     - mkdir /zap/wrk/
-    - /zap/zap-baseline.py -J gl-dast-report.json -t $website || true
+    - /zap/zap-baseline.py -J gl-dast-report.json -t $DAST_WEB_SITE || true
     - cp /zap/wrk/gl-dast-report.json .
   artifacts:
     paths: [gl-dast-report.json]
