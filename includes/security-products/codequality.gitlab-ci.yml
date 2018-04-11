@@ -17,4 +17,5 @@ codequality:
         --volume /var/run/docker.sock:/var/run/docker.sock
         "registry.gitlab.com/gitlab-org/security-products/codequality:$SP_VERSION" /code
   artifacts:
-    paths: [codeclimate.json]
+    paths:
+      - codeclimate.json

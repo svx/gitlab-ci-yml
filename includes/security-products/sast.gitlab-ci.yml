@@ -19,4 +19,5 @@ sast:
         --volume /var/run/docker.sock:/var/run/docker.sock
         "registry.gitlab.com/gitlab-org/security-products/sast:$SP_VERSION" /app/bin/run /code
   artifacts:
-    paths: [gl-sast-report.json]
+    paths:
+      - gl-sast-report.json

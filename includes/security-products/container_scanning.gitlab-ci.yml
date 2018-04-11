@@ -24,4 +24,5 @@ container_scanning:
     - touch clair-whitelist.yml
     - ./clair-scanner -c http://docker:6060 --ip $(hostname -i) -r gl-sast-container-report.json -l clair.log -w clair-whitelist.yml ${CI_APPLICATION_REPOSITORY}:${CI_APPLICATION_TAG} || true
   artifacts:
-    paths: [gl-sast-container-report.json]
+    paths:
+      - gl-sast-container-report.json

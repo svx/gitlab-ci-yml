@@ -15,4 +15,5 @@ dast:
     - /zap/zap-baseline.py -J gl-dast-report.json -t $DAST_WEB_SITE || true
     - cp /zap/wrk/gl-dast-report.json .
   artifacts:
-    paths: [gl-dast-report.json]
+    paths:
+     - gl-dast-report.json
