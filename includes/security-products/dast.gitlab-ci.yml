@@ -5,8 +5,7 @@ dast:
   cache: {}
   dependencies: []
   tags: []
-  services:
-    - docker:stable-dind
+  services: []
   variables:
     DOCKER_DRIVER: overlay2
   script:
@@ -16,4 +15,4 @@ dast:
     - cp /zap/wrk/gl-dast-report.json .
   artifacts:
     paths:
-     - gl-dast-report.json
+      - gl-dast-report.json
