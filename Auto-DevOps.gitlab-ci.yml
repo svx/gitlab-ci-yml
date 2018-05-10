@@ -245,9 +245,6 @@ staging:
     kubernetes: active
     variables:
       - $STAGING_ENABLED
-  except:
-    variables:
-      - $INCREMENTAL_ROLLOUT_ENABLED
 
 # Canaries are disabled by default, but if you want them,
 # and know what the downsides are, enable this job by removing the dot (.),
@@ -345,6 +342,7 @@ rollout 10%:
   <<: *rollout_template
   variables:
     ROLLOUT_PERCENTAGE: 10
+  when: manual
   only:
     refs:
       - master
