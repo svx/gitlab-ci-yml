@@ -88,14 +88,6 @@ codequality:
   artifacts:
     paths: [codeclimate.json]
 
-license_management:
-  image: registry.gitlab.com/gitlab-org/security-products/license-management:latest
-  allow_failure: true
-  script:
-    - license_management
-  artifacts:
-    paths: [gl-license-report.json]
-
 performance:
   stage: performance
   image: docker:stable
@@ -426,14 +418,6 @@ rollout 100%:
                --volume "$PWD":/code \
                --volume /var/run/docker.sock:/var/run/docker.sock \
                "registry.gitlab.com/gitlab-org/security-products/codequality:$SP_VERSION" /code
-  }
-
-  function license_management() {
-    if echo $GITLAB_FEATURES |grep license_management > /dev/null ; then
-      /run.sh .
-    else
-      echo "License management is not available in your subscription"
-    fi
   }
 
   function sast() {
