@@ -542,12 +542,14 @@ rollout 100%:
 
     replicas=$(get_replicas "$track" "$percentage")
 
-    helm upgrade --reuse-values \
-      --wait \
-      --set replicaCount="$replicas" \
-      --namespace="$KUBE_NAMESPACE" \
-      "$name" \
-      chart/
+    if [[ -n "$(helm ls -q "^$name$")" ]]; then
+      helm upgrade --reuse-values \
+        --wait \
+        --set replicaCount="$replicas" \
+        --namespace="$KUBE_NAMESPACE" \
+        "$name" \
+        chart/
+    fi
   }
 
   function install_dependencies() {
