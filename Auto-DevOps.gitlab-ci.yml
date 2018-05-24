@@ -657,7 +657,7 @@ rollout 100%:
   function check_kube_domain() {
     if [ -z ${AUTO_DEVOPS_DOMAIN+x} ]; then
       echo "In order to deploy or use Review Apps, AUTO_DEVOPS_DOMAIN variable must be set"
-      echo "You can do it in Auto DevOps project settings or defining a secret variable at group or project level"
+      echo "You can do it in Auto DevOps project settings or defining a variable at group or project level"
       echo "You can also manually add it in .gitlab-ci.yml"
       false
     else
