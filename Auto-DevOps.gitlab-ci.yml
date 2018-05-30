@@ -92,6 +92,7 @@ test:
       - $TEST_DISABLED
 
 codequality:
+  stage: test
   image: docker:stable
   variables:
     DOCKER_DRIVER: overlay2
@@ -131,6 +132,7 @@ performance:
       - $PERFORMANCE_DISABLED
 
 sast:
+  stage: test
   image: docker:stable
   variables:
     DOCKER_DRIVER: overlay2
@@ -147,6 +149,7 @@ sast:
       - $SAST_DISABLED
 
 dependency_scanning:
+  stage: test
   image: docker:stable
   variables:
     DOCKER_DRIVER: overlay2
@@ -163,6 +166,7 @@ dependency_scanning:
       - $DEPENDENCY_SCANNING_DISABLED
 
 sast:container:
+  stage: test
   image: docker:stable
   variables:
     DOCKER_DRIVER: overlay2
