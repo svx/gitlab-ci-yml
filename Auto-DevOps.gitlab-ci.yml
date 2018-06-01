@@ -105,6 +105,8 @@ code_quality:
     - code_quality
   artifacts:
     paths: [gl-code-quality-report.json]
+  only:
+    - branches
   except:
     variables:
       - $CODE_QUALITY_DISABLED
@@ -161,6 +163,8 @@ sast:
     - sast
   artifacts:
     paths: [gl-sast-report.json]
+  only:
+    - branches
   except:
     variables:
       - $SAST_DISABLED
@@ -178,6 +182,8 @@ dependency_scanning:
     - dependency_scanning
   artifacts:
     paths: [gl-dependency-scanning-report.json]
+  only:
+    - branches
   except:
     variables:
       - $DEPENDENCY_SCANNING_DISABLED
@@ -195,6 +201,8 @@ container_scanning:
     - container_scanning
   artifacts:
     paths: [gl-container-scanning-report.json]
+  only:
+    - branches
   except:
     variables:
       - $CONTAINER_SCANNING_DISABLED
