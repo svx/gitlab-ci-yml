@@ -9,7 +9,7 @@
 #
 # Test jobs may be disabled by setting environment variables:
 # * test: TEST_DISABLED
-# * code_quality: CODEQUALITY_DISABLED
+# * code_quality: CODE_QUALITY_DISABLED
 # * performance: PERFORMANCE_DISABLED
 # * sast: SAST_DISABLED
 # * dependency_scanning: DEPENDENCY_SCANNING_DISABLED
@@ -106,7 +106,7 @@ code_quality:
     paths: [gl-code-quality-report.json]
   except:
     variables:
-      - $CODEQUALITY_DISABLED
+      - $CODE_QUALITY_DISABLED
 
 performance:
   stage: performance
