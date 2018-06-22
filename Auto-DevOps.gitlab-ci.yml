@@ -376,6 +376,7 @@ production_manual:
     kubernetes: active
     variables:
       - $STAGING_ENABLED
+      - $CANARY_ENABLED
   except:
     variables:
       - $INCREMENTAL_ROLLOUT_ENABLED
