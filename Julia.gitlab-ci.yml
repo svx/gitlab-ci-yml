@@ -26,17 +26,26 @@
       println("(", cl/tl*100, "%) covered")'
 
 # Name a test and select an appropriate image.
-test:0.4.6:
-  image: julialang/julia:v0.4.6
+# images comes from Docker hub
+test:0.6.4: # images comes from Docker hub
+  image: julia:0.6.4
+  <<: *test_definition
+  
+test:0.7: # images comes from Docker hub
+  image: julia:0.7
+  <<: *test_definition
+  
+test:1.0: # images comes from Docker hub
+  image: julia:1.0
   <<: *test_definition
 
 # Maybe you would like to test your package against the development branch:
-test:0.5.0-dev:
-  image: julialang/julia:v0.5.0-dev
-  # ... allowing for failures, since we are testing against the development
-  # branch:
-  allow_failure: true
-  <<: *test_definition
+#test:0.5.0-dev:
+#  image: julialang/julia:v0.5.0-dev
+#  # ... allowing for failures, since we are testing against the development
+#  # branch:
+#  allow_failure: true
+#  <<: *test_definition
 
 # REMARK: Do not forget to enable the coverage feature for your project, if you
 # are using code coverage reporting above. This can be done by
