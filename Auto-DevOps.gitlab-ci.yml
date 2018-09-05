@@ -406,7 +406,7 @@ rollout 10%:
   <<: *rollout_template
   variables:
     ROLLOUT_PERCENTAGE: 10
-  when: manual
+  when: in 30 mins
   only:
     refs:
       - master
@@ -418,7 +418,7 @@ rollout 25%:
   <<: *rollout_template
   variables:
     ROLLOUT_PERCENTAGE: 25
-  when: manual
+  when: in 1 hr
   only:
     refs:
       - master
@@ -430,7 +430,7 @@ rollout 50%:
   <<: *rollout_template
   variables:
     ROLLOUT_PERCENTAGE: 50
-  when: manual
+  when: in 1 hr 30 min
   only:
     refs:
       - master
@@ -440,7 +440,7 @@ rollout 50%:
 
 rollout 100%:
   <<: *production_template
-  when: manual
+  when: in 2 hrs
   allow_failure: false
   only:
     refs:
